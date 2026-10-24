@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, Search, ShoppingCart, X, User } from 'lucide-react';
+import { Menu, Search, ShoppingCart, X, User, ShieldCheck } from 'lucide-react';
 import { cn, useIsMounted } from '@/lib/utils';
 import { brandConfig } from '@/lib/config';
 import { Avatar } from '@/components/ui/avatar';

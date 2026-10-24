@@ -305,10 +305,14 @@ export function Footer() {
         <div className="mx-auto max-w-7xl px-3 md:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-sm text-blue-200/75">
             <p>&copy; {new Date().getFullYear()} {brandConfig.name}. All rights reserved.</p>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
               <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
               <Link href="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link>
+              <span className="text-white/20">|</span>
+              <Link href="/admin/login" prefetch={true} className="text-blue-300/90 hover:text-white transition-colors font-medium">
+                Admin Portal
+              </Link>
             </div>
             <p className="text-xs text-blue-300/60">Made with care for your health & beauty</p>
           </div>

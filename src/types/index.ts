@@ -253,7 +253,7 @@ export type OrderStatus =
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded';
 
-export type PaymentMethod = 'razorpay' | 'cod' | 'wallet' | 'bank_transfer';
+export type PaymentMethod = 'razorpay' | 'cod' | 'wallet' | 'bank_transfer' | 'wise' | 'ach' | 'link' | 'btc';
 
 export type PrescriptionStatus = 'not_required' | 'pending' | 'approved' | 'rejected' | 'expired';
 

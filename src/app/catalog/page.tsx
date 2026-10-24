@@ -1,0 +1,10 @@
+import { products, categories } from '@/lib/catalog';
+import { ProductCard } from '@/components/product/product-card';
+
+export default async function CatalogPage({ searchParams }: { searchParams: Promise<{ category?: string; search?: string }> }) {
+  const params = await searchParams;
+  const search = params.search?.toLowerCase() ?? '';
+  const selectedCategory = params.category;
+  const filtered = products.filter((product) => (!selectedCategory || product.category_id === selectedCategory) && (!search || `${product.name} ${product.tags.join(' ')} ${product.category_id}`.toLowerCase().includes(search)));
+  return <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6"><p className="text-sm font-bold text-primary">SHOP</p><h1 className="mt-1 text-3xl font-bold text-navy">Everyday health & beauty</h1><p className="mt-2 text-gray-600">Discover carefully selected essentials for your routine.</p><div className="mt-6 flex gap-2 overflow-x-auto pb-2">{[['', 'All products'], ...categories.map(([slug, name]) => [slug, name])].map(([slug, name]) => <a key={slug} href={slug ? `/catalog?category=${slug}` : '/catalog'} className={`whitespace-nowrap rounded-xl border px-3 py-2 text-sm font-medium ${selectedCategory === slug || (!selectedCategory && !slug) ? 'border-primary bg-primary text-white' : 'border-border text-gray-700 hover:bg-primary-light'}`}>{name}</a>)}</div><div className="mt-7 flex items-center justify-between"><p className="text-sm text-gray-500">{filtered.length} products</p><select className="h-10 rounded-xl border border-border bg-white px-3 text-sm text-navy" aria-label="Sort products"><option>Most relevant</option><option>Price: low to high</option><option>Price: high to low</option></select></div>{filtered.length ? <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{filtered.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="mt-12 rounded-2xl border border-dashed border-border p-10 text-center"><h2 className="font-semibold text-navy">No products found</h2><p className="mt-1 text-sm text-gray-500">Try another search or category.</p></div>}</div>;
+}

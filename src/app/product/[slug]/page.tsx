@@ -2,20 +2,30 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { AlertTriangle, Check, ChevronRight, ShieldCheck, Star, Truck } from 'lucide-react';
-import { getProduct, getAllProducts } from '@/lib/catalog';
+import { getOrFetchServerProduct, getServerProducts } from '@/lib/server-catalog';
 import { ProductCard } from '@/components/product/product-card';
 import { ProductPrice } from '@/components/product/product-price';
+import { ProductReviews } from '@/components/product/product-reviews';
 import { AddToCart } from './purchase-actions';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  const products = getServerProducts();
+  return products.map((p) => ({
+    slug: p.slug || p.id,
+  }));
+}
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = getProduct(slug);
+  const decodedSlug = decodeURIComponent(slug);
+
+  const product = await getOrFetchServerProduct(decodedSlug);
   if (!product) notFound();
 
-  const all = getAllProducts();
+  const all = getServerProducts();
   const related = all
     .filter((item) => item.category_id === product.category_id && item.id !== product.id)
     .slice(0, 4);
@@ -69,14 +79,17 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               {product.name}
             </h1>
 
-            <div className="mt-3 flex items-center gap-3 text-sm">
-              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700 border border-emerald-200 text-xs">
+            <a
+              href="#reviews"
+              className="mt-3 inline-flex items-center gap-3 text-sm group hover:opacity-90 transition-opacity"
+            >
+              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700 border border-emerald-200 text-xs group-hover:bg-emerald-100 transition-colors">
                 <Star className="h-3.5 w-3.5 fill-current" /> {product.rating_average.toFixed(1)}
               </span>
-              <span className="text-xs text-gray-500 font-medium">
+              <span className="text-xs text-gray-500 font-medium group-hover:text-primary transition-colors underline-offset-2 hover:underline">
                 {product.rating_count} verified buyer ratings
               </span>
-            </div>
+            </a>
 
             <div className="mt-4">
               <ProductPrice
@@ -145,6 +158,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </details>
         ))}
       </section>
+      
+      {/* Product Reviews & Ratings */}
+      <ProductReviews product={product} />
 
       {/* Related Products */}
       <section className="mt-16">

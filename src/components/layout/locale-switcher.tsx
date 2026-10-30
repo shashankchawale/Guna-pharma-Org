@@ -2,6 +2,7 @@
 
 import { ChevronDown, Globe2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useIsMounted } from '@/lib/utils';
 import {
   useLocaleStore,
   supportedLanguages,
@@ -13,7 +14,11 @@ import {
 export function LocaleSwitcher({ compact = false, dropup = false }: { compact?: boolean; dropup?: boolean }) {
   const [open, setOpen] = useState(false);
   const { language, currency, setLanguage, setCurrency } = useLocaleStore();
+  const mounted = useIsMounted();
   const ref = useRef<HTMLDivElement>(null);
+
+  const activeLanguage = mounted ? language : supportedLanguages[0];
+  const activeCurrency = mounted ? currency : supportedCurrencies[0];
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -49,8 +54,8 @@ export function LocaleSwitcher({ compact = false, dropup = false }: { compact?: 
         <Globe2 className="h-4 w-4 text-primary shrink-0" />
         <span className="whitespace-nowrap">
           {compact
-            ? `${language.code.toUpperCase()} · ${currency.code}`
-            : `${language.flag} ${language.label} · ${currency.code}`}
+            ? `${activeLanguage.code.toUpperCase()} · ${activeCurrency.code}`
+            : `${activeLanguage.flag} ${activeLanguage.label} · ${activeCurrency.code}`}
         </span>
         <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>

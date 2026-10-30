@@ -7,6 +7,7 @@ interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
   fallback?: string;
+  email?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
@@ -17,8 +18,9 @@ const sizeClasses = {
   xl: 'h-16 w-16 text-lg',
 };
 
-export function Avatar({ className, src, alt, fallback, size = 'md', ...props }: AvatarProps) {
+export function Avatar({ className, src, alt, fallback, email, size = 'md', ...props }: AvatarProps) {
   const [imageError, setImageError] = React.useState(false);
+  const resolvedFallback = fallback || (email ? email[0]?.toUpperCase() : alt ? getInitials(alt) : '?');
 
   if (src && !imageError) {
     return (
@@ -46,7 +48,7 @@ export function Avatar({ className, src, alt, fallback, size = 'md', ...props }:
       )}
       {...props}
     >
-      {fallback || (alt ? getInitials(alt) : '?')}
+      {resolvedFallback}
     </div>
   );
 }

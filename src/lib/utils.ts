@@ -5,11 +5,14 @@ import { twMerge } from 'tailwind-merge';
 const emptySubscribe = () => () => {};
 
 export function useIsMounted(): boolean {
-  return React.useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false
-  );
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  return mounted;
 }
 
 export function cn(...inputs: ClassValue[]) {

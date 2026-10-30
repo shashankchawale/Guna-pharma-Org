@@ -65,9 +65,13 @@ export interface Product {
   meta_description?: string;
   created_at: string;
   updated_at: string;
-  // Relations
-  category?: Category;
+  // Relations & convenience aliases
+  category?: Category | string;
   brand?: Brand;
+  price?: number;
+  discount?: number;
+  image_url?: string;
+  is_available?: boolean;
 }
 
 export interface CartItem {

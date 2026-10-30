@@ -29,6 +29,7 @@ import {
   Phone,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   ShoppingBag,
@@ -49,18 +50,6 @@ import { createClient } from '@/lib/supabase/client';
 import { useOrdersStore } from '@/store/orders';
 import { useProductsStore } from '@/store/products';
 
-const PHOTO_PRESETS = [
-  { label: 'Hair Growth Serum', url: '/products/bontress-pro-scalp-serum.png' },
-  { label: 'Minoxidil Solution', url: '/products/mintop-forte-5-minoxidil.png' },
-  { label: 'Benzoyl Wash Bottle', url: '/products/benzac-ac-gel-wash-benzoyl-peroxide.png' },
-  { label: 'Glutathione Capsules', url: '/products/miduty-liposomal-glutathione.png' },
-  { label: 'Omega 3 Fish Oil', url: '/products/tata-1mg-triple-strength-omega-3.png' },
-  { label: 'Ketocip Shampoo', url: '/products/ketocip-2-ketoconazole-shampoo.png' },
-  { label: 'Zylopred Eye Drops', url: '/products/zylopred-ophthalmic-suspension.png' },
-  { label: 'Derma Co Cream', url: '/products/derma-co-ceramide-ha-moisturizer.png' },
-  { label: 'Minimalist Vit C', url: '/products/minimalist-vitamin-c-10-serum.png' },
-  { label: 'Nutracitta Gummies', url: '/products/nutracitta-daily-multivitamin-gummy.png' },
-];
 
 const AUTHORIZED_ADMIN_EMAILS = [
   'shashank@gunapharma.com',
@@ -156,9 +145,11 @@ export default function AdminDashboardPage() {
   // Products state (live persistent store)
   const {
     products: productList,
+    deletedProductIds,
     addProduct: storeAddProduct,
     updateProduct: storeUpdateProduct,
     deleteProduct: storeDeleteProduct,
+    resetDeletedProducts,
     syncWithServer,
   } = useProductsStore();
 
@@ -190,10 +181,19 @@ export default function AdminDashboardPage() {
   const [formMrp, setFormMrp] = React.useState('299');
   const [formSellingPrice, setFormSellingPrice] = React.useState('249');
   const [formStock, setFormStock] = React.useState('50');
+  const [formIsAvailable, setFormIsAvailable] = React.useState(true);
   const [formRequiresRx, setFormRequiresRx] = React.useState(false);
   const [formTags, setFormTags] = React.useState('Healthcare, Clinical');
   const [formDescription, setFormDescription] = React.useState('Quality-assured product verified for clinical purity.');
   const [formImageUrl, setFormImageUrl] = React.useState('https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80');
+  const [supabaseHealth, setSupabaseHealth] = React.useState<{ connected: boolean; tableExists: boolean; url: string; error?: string } | null>(null);
+
+  React.useEffect(() => {
+    fetch('/api/products?status=true')
+      .then((r) => r.json())
+      .then((h) => setSupabaseHealth(h))
+      .catch(() => {});
+  }, []);
 
   const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -415,21 +415,28 @@ export default function AdminDashboardPage() {
     const priceNum = Number(formSellingPrice) || 249;
     const slug = formName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const finalImage = formImageUrl.trim() || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80';
+    const calculatedDiscount = mrpNum > 0 && priceNum < mrpNum ? Math.round(((mrpNum - priceNum) / mrpNum) * 100) : 0;
+    const stockNum = formIsAvailable ? (Number(formStock) || 50) : 0;
 
     const newProduct: Product = {
       id: generateNewProductId(),
       name: formName,
       slug: slug || generateNewProductId(),
       category_id: formCategoryId,
+      category: formCategoryId,
       brand_id: formBrand.toLowerCase().replace(/\s+/g, '-'),
       mrp: mrpNum,
       selling_price: priceNum,
-      discount_percent: Math.round((1 - priceNum / mrpNum) * 100),
-      stock_quantity: Number(formStock) || 50,
+      price: priceNum,
+      discount: calculatedDiscount,
+      discount_percent: calculatedDiscount,
+      stock_quantity: stockNum,
       low_stock_threshold: 10,
       sku: generateNewProductSku(),
       images: [finalImage],
       thumbnail_url: finalImage,
+      image_url: finalImage,
+      is_available: formIsAvailable,
       requires_prescription: formRequiresRx,
       short_description: formDescription,
       description: formDescription,
@@ -448,7 +455,7 @@ export default function AdminDashboardPage() {
 
     storeAddProduct(newProduct);
     setIsAddModalOpen(false);
-    showToast(`Product '${formName}' created successfully! Added to website.`);
+    showToast(`Product '${formName}' created successfully! Added to catalog database.`);
     setFormName('');
   };
 
@@ -456,15 +463,16 @@ export default function AdminDashboardPage() {
   const openEditModal = (p: Product) => {
     setEditingProduct(p);
     setFormName(p.name);
-    setFormCategoryId(p.category_id);
+    setFormCategoryId(p.category_id || (typeof p.category === 'string' ? p.category : 'medicines'));
     setFormBrand(p.manufacturer || 'GUNA PHARMA');
     setFormMrp(String(p.mrp));
-    setFormSellingPrice(String(p.selling_price));
+    setFormSellingPrice(String(p.selling_price || p.price || p.mrp));
     setFormStock(String(p.stock_quantity));
+    setFormIsAvailable(p.is_available !== undefined ? Boolean(p.is_available) : p.stock_quantity > 0);
     setFormRequiresRx(p.requires_prescription);
-    setFormTags(p.tags.join(', '));
-    setFormDescription(p.description || '');
-    setFormImageUrl(p.thumbnail_url || p.images?.[0] || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80');
+    setFormTags((p.tags || []).join(', '));
+    setFormDescription(p.description || p.short_description || '');
+    setFormImageUrl(p.thumbnail_url || p.image_url || p.images?.[0] || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80');
     setIsEditModalOpen(true);
   };
 
@@ -475,66 +483,116 @@ export default function AdminDashboardPage() {
 
     const mrpNum = Number(formMrp) || editingProduct.mrp;
     const priceNum = Number(formSellingPrice) || editingProduct.selling_price;
-    const finalImage = formImageUrl.trim() || editingProduct.thumbnail_url || editingProduct.images?.[0] || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80';
+    const finalImage = formImageUrl.trim() || editingProduct.thumbnail_url || editingProduct.image_url || editingProduct.images?.[0] || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80';
+    const calculatedDiscount = mrpNum > 0 && priceNum < mrpNum ? Math.round(((mrpNum - priceNum) / mrpNum) * 100) : 0;
+    const stockNum = formIsAvailable ? (Number(formStock) || 0) : 0;
 
     const updatedProduct: Product = {
       ...editingProduct,
       name: formName,
       category_id: formCategoryId,
+      category: formCategoryId,
       mrp: mrpNum,
       selling_price: priceNum,
-      discount_percent: Math.round((1 - priceNum / mrpNum) * 100),
-      stock_quantity: Number(formStock) || 0,
+      price: priceNum,
+      discount: calculatedDiscount,
+      discount_percent: calculatedDiscount,
+      stock_quantity: stockNum,
+      is_available: formIsAvailable,
       images: [finalImage],
       thumbnail_url: finalImage,
+      image_url: finalImage,
       requires_prescription: formRequiresRx,
       tags: formTags.split(',').map((t) => t.trim()).filter(Boolean),
       description: formDescription,
+      short_description: formDescription,
       updated_at: new Date().toISOString(),
     };
 
     storeUpdateProduct(updatedProduct);
     setIsEditModalOpen(false);
     setEditingProduct(null);
-    showToast(`Product '${formName}' updated successfully!`);
+    showToast(`Product '${formName}' updated successfully in catalog database!`);
   };
 
   // Confirm Delete
   const confirmDeleteProduct = () => {
     if (!deletingProduct) return;
-    storeDeleteProduct(deletingProduct.id);
+    const target = deletingProduct;
     setIsDeleteModalOpen(false);
-    showToast(`Product '${deletingProduct.name}' deleted.`);
     setDeletingProduct(null);
+    storeDeleteProduct(target.id);
+    if (target.slug && target.slug !== target.id) {
+      storeDeleteProduct(target.slug);
+    }
+    showToast(`Product '${target.name}' deleted successfully! Removed from Home and Catalog.`);
   };
 
-  // Filtered Bookings
+  // Filtered Bookings with multi-word search
   const filteredBookings = bookings.filter((b) => {
     if (bookingFilter === 'pending' && b.status !== 'pending') return false;
     if (bookingFilter === 'shipped' && b.status !== 'shipped') return false;
     if (bookingFilter === 'delivered' && b.status !== 'delivered') return false;
 
     if (bookingSearch.trim()) {
-      const q = bookingSearch.toLowerCase();
-      const matchNum = b.order_number?.toLowerCase().includes(q);
-      const matchName = b.shipping_address?.full_name?.toLowerCase().includes(q);
-      const matchEmail = b.guest_email?.toLowerCase().includes(q);
-      const matchPhone = b.shipping_address?.phone?.includes(q);
-      return matchNum || matchName || matchEmail || matchPhone;
+      const words = bookingSearch.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      const bookingBlob = [
+        b.order_number,
+        b.shipping_address?.full_name,
+        b.guest_email,
+        b.shipping_address?.phone,
+        b.shipping_address?.city,
+        b.shipping_address?.address,
+        b.shipping_address?.notes,
+        ...(b.items || []).map((it) => it.product_name),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return words.every((word) => bookingBlob.includes(word));
     }
     return true;
   });
 
-  // Filtered Products
+  // Filtered Products with multi-word smart matching
   const filteredProducts = productList.filter((p) => {
-    if (categoryFilter !== 'all' && p.category_id !== categoryFilter) return false;
+    if (categoryFilter !== 'all') {
+      const pCat = (p.category_id || (typeof p.category === 'string' ? p.category : '')).toLowerCase();
+      if (categoryFilter === 'medicines') {
+        const isMed =
+          pCat === 'medicines' ||
+          p.requires_prescription ||
+          ['pain-relief', 'cold-flu', 'digestive-health', 'first-aid'].includes(pCat);
+        if (!isMed) return false;
+      } else if (categoryFilter === 'beauty') {
+        if (!['beauty', 'cosmetics', 'hair-care', 'makeup'].includes(pCat)) return false;
+      } else if (categoryFilter === 'skincare') {
+        if (!['skincare', 'body-care', 'skin'].includes(pCat)) return false;
+      } else if (categoryFilter === 'wellness') {
+        if (!['wellness', 'vitamins', 'supplements', 'ayurveda', 'herbal'].includes(pCat)) return false;
+      } else if (pCat !== categoryFilter) {
+        return false;
+      }
+    }
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        p.category_id.toLowerCase().includes(q)
-      );
+      const words = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      const searchableBlob = [
+        p.name,
+        p.composition,
+        p.sku,
+        p.category_id,
+        p.manufacturer,
+        p.brand,
+        p.short_description,
+        p.description,
+        ...(p.tags || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return words.every((w) => searchableBlob.includes(w));
     }
     return true;
   });
@@ -947,26 +1005,75 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className="h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
                 >
-                  <option value="all">All Categories ({productList.length})</option>
-                  <option value="medicines">Medicines</option>
-                  <option value="vitamins">Wellness & Vitamins</option>
-                  <option value="skincare">Skincare & Cosmetics</option>
-                  <option value="pain-relief">Pain Relief</option>
-                  <option value="cold-flu">Cold & Flu</option>
-                  <option value="digestive-health">Digestive Health</option>
-                  <option value="first-aid">First Aid</option>
+                  <option value="all">All Products ({productList.length})</option>
+                  <option value="medicines">Medicines (Rx & Healthcare)</option>
+                  <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
+                  <option value="skincare">Skincare (Face & Body)</option>
+                  <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
+                  <option value="hair-care">Hair & Scalp Care</option>
+                  <option value="pain-relief">Pain Relief & Fever</option>
                 </select>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="h-10 px-5 rounded-xl bg-primary text-xs font-extrabold text-white shadow-soft hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 shrink-0"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Product</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {deletedProductIds && deletedProductIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetDeletedProducts();
+                    showToast('Catalog restored! All deleted items have been restored.');
+                  }}
+                  className="h-10 px-3.5 rounded-xl border border-amber-200 bg-amber-50 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
+                  title="Restore all deleted items back to the catalog"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                  <span>Restore Deleted ({Math.ceil(deletedProductIds.length / 2)})</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await syncWithServer(true);
+                  const res = await fetch('/api/products?status=true');
+                  const h = await res.json();
+                  setSupabaseHealth(h);
+                  showToast('Catalog refreshed and synced with database!');
+                }}
+                className="h-10 px-3.5 rounded-xl border border-border bg-white text-xs font-bold text-navy hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
+                title="Refresh and sync catalog products"
+              >
+                <RefreshCw className="h-3.5 w-3.5 text-primary" />
+                <span>Sync Database</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="h-10 px-5 rounded-xl bg-primary text-xs font-extrabold text-white shadow-soft hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Product</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Database & Supabase Live Status Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-slate-50 p-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-navy">Database Status:</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 font-bold text-emerald-700 border border-emerald-200">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Active Database Store ({productList.length} Items)
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 font-bold text-primary border border-blue-200">
+                Supabase: {supabaseHealth?.connected ? 'Online' : 'Standby'}
+              </span>
+            </div>
+            <span className="text-[11px] text-gray-500">
+              Admin changes update both local database & Supabase in real time.
+            </span>
           </div>
 
           <div className="rounded-3xl border border-border/80 bg-white shadow-soft overflow-hidden">
@@ -977,7 +1084,7 @@ export default function AdminDashboardPage() {
                     <th className="px-4 py-3.5">Product</th>
                     <th className="px-4 py-3.5">Category</th>
                     <th className="px-4 py-3.5">Price / MRP</th>
-                    <th className="px-4 py-3.5">Stock</th>
+                    <th className="px-4 py-3.5">Stock & Availability</th>
                     <th className="px-4 py-3.5">Prescription</th>
                     <th className="px-4 py-3.5 text-right">Actions</th>
                   </tr>
@@ -988,16 +1095,16 @@ export default function AdminDashboardPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-border/80 p-0.5 shadow-2xs">
-                            {product.thumbnail_url || product.images?.[0] ? (
+                            {product.thumbnail_url || product.image_url || product.images?.[0] ? (
                               <img
-                                src={product.thumbnail_url || product.images?.[0]}
+                                src={product.thumbnail_url || product.image_url || product.images?.[0]}
                                 alt={product.name}
                                 className="h-full w-full object-contain"
                                 loading="lazy"
                               />
                             ) : (
                               <div className="grid h-full w-full place-items-center bg-primary-light text-base">
-                                {product.category_id === 'skincare' ? '🧴' : product.category_id === 'vitamins' ? '💊' : '🌿'}
+                                {product.category_id === 'skincare' ? '🧴' : product.category_id === 'wellness' ? '💊' : '🌿'}
                               </div>
                             )}
                           </div>
@@ -1009,19 +1116,29 @@ export default function AdminDashboardPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-block rounded-lg bg-slate-100 px-2 py-1 font-semibold text-gray-700 capitalize">
-                          {product.category_id.replace(/-/g, ' ')}
+                          {(product.category_id || (typeof product.category === 'string' ? product.category : 'medicines')).replace(/-/g, ' ')}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-bold text-navy">
-                        {formatPrice(product.selling_price)}{' '}
+                        {formatPrice(product.selling_price || product.price || product.mrp)}{' '}
                         <span className="text-[10px] font-normal text-gray-400 line-through">
                           {formatPrice(product.mrp)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 border border-emerald-200">
-                          {product.stock_quantity} in stock
-                        </span>
+                        {product.is_available === false ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-bold text-rose-700 border border-rose-200">
+                            Unavailable
+                          </span>
+                        ) : product.stock_quantity <= 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-bold text-amber-700 border border-amber-200">
+                            Out of Stock
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 border border-emerald-200">
+                            {product.stock_quantity} in stock
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {product.requires_prescription ? (
@@ -1249,28 +1366,6 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* Quick Presets */}
-                <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                    Or select quick preset photo:
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PHOTO_PRESETS.map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => setFormImageUrl(preset.url)}
-                        className={`px-2 py-1 rounded-md text-[10px] font-medium border transition-colors ${
-                          formImageUrl === preset.url
-                            ? 'bg-primary text-white border-primary shadow-xs'
-                            : 'bg-white text-gray-600 border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1281,13 +1376,15 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setFormCategoryId(e.target.value)}
                     className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="medicines">Medicines</option>
-                    <option value="vitamins">Wellness & Vitamins</option>
-                    <option value="skincare">Skincare & Cosmetics</option>
-                    <option value="pain-relief">Pain Relief</option>
+                    <option value="medicines">Medicines (Rx & Healthcare)</option>
+                    <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
+                    <option value="skincare">Skincare (Face & Body Care)</option>
+                    <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
+                    <option value="pain-relief">Pain Relief & Fever</option>
+                    <option value="hair-care">Hair & Scalp Care</option>
                     <option value="cold-flu">Cold & Flu</option>
                     <option value="digestive-health">Digestive Health</option>
-                    <option value="first-aid">First Aid</option>
+                    <option value="first-aid">First Aid & Antiseptics</option>
                   </select>
                 </div>
 
@@ -1337,17 +1434,32 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="rxAddCheck"
-                  checked={formRequiresRx}
-                  onChange={(e) => setFormRequiresRx(e.target.checked)}
-                  className="h-4 w-4 text-primary focus:ring-primary rounded cursor-pointer"
-                />
-                <label htmlFor="rxAddCheck" className="font-bold text-navy cursor-pointer">
-                  Requires Doctor&apos;s Prescription (Rx)
-                </label>
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="availAddCheck"
+                    checked={formIsAvailable}
+                    onChange={(e) => setFormIsAvailable(e.target.checked)}
+                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 rounded cursor-pointer"
+                  />
+                  <label htmlFor="availAddCheck" className="font-bold text-navy cursor-pointer text-xs">
+                    In Stock & Available for Sale
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="rxAddCheck"
+                    checked={formRequiresRx}
+                    onChange={(e) => setFormRequiresRx(e.target.checked)}
+                    className="h-4 w-4 text-primary focus:ring-primary rounded cursor-pointer"
+                  />
+                  <label htmlFor="rxAddCheck" className="font-bold text-navy cursor-pointer text-xs">
+                    Prescription Required (Rx)
+                  </label>
+                </div>
               </div>
 
               <div>
@@ -1470,28 +1582,6 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* Quick Presets */}
-                <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                    Or select quick preset photo:
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PHOTO_PRESETS.map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => setFormImageUrl(preset.url)}
-                        className={`px-2 py-1 rounded-md text-[10px] font-medium border transition-colors ${
-                          formImageUrl === preset.url
-                            ? 'bg-primary text-white border-primary shadow-xs'
-                            : 'bg-white text-gray-600 border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1502,13 +1592,15 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setFormCategoryId(e.target.value)}
                     className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="medicines">Medicines</option>
-                    <option value="vitamins">Wellness & Vitamins</option>
-                    <option value="skincare">Skincare & Cosmetics</option>
-                    <option value="pain-relief">Pain Relief</option>
+                    <option value="medicines">Medicines (Rx & Healthcare)</option>
+                    <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
+                    <option value="skincare">Skincare (Face & Body Care)</option>
+                    <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
+                    <option value="pain-relief">Pain Relief & Fever</option>
+                    <option value="hair-care">Hair & Scalp Care</option>
                     <option value="cold-flu">Cold & Flu</option>
                     <option value="digestive-health">Digestive Health</option>
-                    <option value="first-aid">First Aid</option>
+                    <option value="first-aid">First Aid & Antiseptics</option>
                   </select>
                 </div>
 
@@ -1548,17 +1640,32 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="rxEditCheck"
-                  checked={formRequiresRx}
-                  onChange={(e) => setFormRequiresRx(e.target.checked)}
-                  className="h-4 w-4 text-primary focus:ring-primary rounded cursor-pointer"
-                />
-                <label htmlFor="rxEditCheck" className="font-bold text-navy cursor-pointer">
-                  Requires Doctor&apos;s Prescription (Rx)
-                </label>
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="availEditCheck"
+                    checked={formIsAvailable}
+                    onChange={(e) => setFormIsAvailable(e.target.checked)}
+                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 rounded cursor-pointer"
+                  />
+                  <label htmlFor="availEditCheck" className="font-bold text-navy cursor-pointer text-xs">
+                    In Stock & Available for Sale
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="rxEditCheck"
+                    checked={formRequiresRx}
+                    onChange={(e) => setFormRequiresRx(e.target.checked)}
+                    className="h-4 w-4 text-primary focus:ring-primary rounded cursor-pointer"
+                  />
+                  <label htmlFor="rxEditCheck" className="font-bold text-navy cursor-pointer text-xs">
+                    Prescription Required (Rx)
+                  </label>
+                </div>
               </div>
 
               <div>

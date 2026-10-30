@@ -8,6 +8,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { CookieConsent } from '@/components/common/cookie-consent';
 import { WhatsAppButton } from '@/components/common/whatsapp-button';
 import { ScrollToTop } from '@/components/common/scroll-to-top';
+import { NavigationProgressBar } from '@/components/common/navigation-progress';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
@@ -64,14 +66,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="antialiased">
-      <body className="min-h-screen bg-white text-navy flex flex-col">
+    <html lang="en" className="antialiased scrollbar-none" suppressHydrationWarning>
+      <body className="min-h-screen w-full max-w-full overflow-x-hidden bg-white text-navy flex flex-col scrollbar-none" suppressHydrationWarning>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 px-4 py-2 bg-primary text-white rounded-xl"
         >
           Skip to main content
         </a>
+        <Suspense fallback={null}>
+          <NavigationProgressBar />
+        </Suspense>
         <Header />
         <main id="main-content" className="flex-1 pb-24 md:pb-0">
           {children}

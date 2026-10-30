@@ -1,7 +1,9 @@
 'use client';
 
+import * as React from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { useIsMounted } from '@/lib/utils';
 
 export interface CurrencyConfig {
   code: string;
@@ -244,33 +246,43 @@ const dummyStorage = {
 };
 
 export function formatPriceValue(inrAmount: number, currency: CurrencyConfig): string {
-  const converted = inrAmount * currency.rate;
-  if (currency.code === 'INR') {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(Math.round(converted));
+  const rate = currency?.rate || 1;
+  const converted = inrAmount * rate;
+  if (!currency || currency.code === 'INR') {
+    return `₹${Math.round(converted).toLocaleString('en-IN')}`;
   }
-  return new Intl.NumberFormat(currency.locale, {
-    style: 'currency',
-    currency: currency.code,
+  return `${currency.symbol}${converted.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(converted);
+  })}`;
 }
 
 export function useFormatPrice() {
   const currency = useLocaleStore((state) => state.currency);
-  return (inrAmount: number) => formatPriceValue(inrAmount, currency);
+  const mounted = useIsMounted();
+
+  return React.useCallback(
+    (inrAmount: number) => {
+      // During SSR and initial client hydration pass, use default base currency (INR)
+      // so server HTML and client initial DOM match 100%
+      const activeCurrency = mounted ? currency : supportedCurrencies[0];
+      return formatPriceValue(inrAmount, activeCurrency);
+    },
+    [currency, mounted]
+  );
 }
 
 export function useTranslation() {
   const language = useLocaleStore((state) => state.language);
-  const dict = translations[language.code] || translations.en;
+  const mounted = useIsMounted();
+
+  // During SSR and initial client hydration pass, use default base language (English)
+  const activeLanguage = mounted ? language : supportedLanguages[0];
+  const dict = translations[activeLanguage.code] || translations.en;
+
   return {
     t: (key: string, fallback?: string): string => dict[key] || fallback || key,
-    language,
-    dir: language.dir,
+    language: activeLanguage,
+    dir: activeLanguage.dir,
   };
 }

@@ -48,6 +48,7 @@ export default function CartPage() {
   const [paymentMethod, setPaymentMethod] = React.useState('wise');
   const [notes, setNotes] = React.useState('');
   const [prescription, setPrescription] = React.useState<File | null>(null);
+  const [formError, setFormError] = React.useState('');
 
   const subtotal = getSubtotal();
   const shippingFee = subtotal >= 499 ? 0 : items.length ? 49 : 0;
@@ -56,8 +57,9 @@ export default function CartPage() {
 
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     if (requiresPrescription && !prescription) {
-      alert('Please upload a valid prescription for prescription-only items in your cart.');
+      setFormError('Please upload a valid prescription for prescription-only items in your cart.');
       return;
     }
 
@@ -633,6 +635,12 @@ export default function CartPage() {
             <p className="text-xs text-gray-400 px-2 leading-relaxed">
               Shipping is an estimate — the final cost can vary based on order quantity and delivery address.
             </p>
+
+            {formError && (
+              <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs font-bold text-rose-700">
+                {formError}
+              </div>
+            )}
 
             <button
               type="submit"

@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { ChevronRight, Filter, Pill, ShieldAlert, Sparkles } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ChevronRight, Filter, ShieldAlert, Sparkles } from 'lucide-react';
 import { useProductsStore } from '@/store/products';
 import { ProductCard } from '@/components/product/product-card';
 import type { Product } from '@/types';
@@ -27,8 +28,10 @@ const subcategories = [
 ];
 
 function MedicinesContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const currentFilter = searchParams.get('filter') || 'all';
+  const searchQuery = searchParams.get('search')?.toLowerCase() || '';
 
   const { products, syncWithServer } = useProductsStore();
 
@@ -45,15 +48,34 @@ function MedicinesContent() {
     // 2. Prescription required items
     if (product.requires_prescription) return true;
 
-    // 3. Keyword heuristic on name/tags/composition
-    const textBlob = `${product.name} ${product.category_id} ${product.composition || ''} ${(product.tags || []).join(' ')}`.toLowerCase();
-    const medicineRegex = /(medicine|pharma|tablet|capsule|syrup|paracetamol|crocin|dolo|ibuprofen|fever|cough|flu|antacid|digestive|ointment|antiseptic|pain|wound)/i;
+    // 3. User created admin products under medicine categories
+    if (product.id?.startsWith('prod-') && (
+      product.category_id === 'medicines' ||
+      product.category_id === 'pain-relief' ||
+      product.category_id === 'cold-flu' ||
+      product.category_id === 'digestive-health' ||
+      product.category_id === 'first-aid'
+    )) {
+      return true;
+    }
+
+    // 4. Keyword heuristic on name/tags/composition/sku
+    const textBlob = `${product.name} ${product.category_id} ${product.composition || ''} ${(product.tags || []).join(' ')} ${product.short_description || ''}`.toLowerCase();
+    const medicineRegex = /(medicine|pharma|tablet|capsule|syrup|paracetamol|crocin|dolo|ibuprofen|fever|cough|flu|antacid|digestive|ointment|antiseptic|pain|wound|antibiotic|rx|drops|gel|cream|suspension|spray|inhaler|injection|insulin|dose|mg|ml|patch|bandage)/i;
     return medicineRegex.test(textBlob);
   }, []);
 
   const medicineProducts = React.useMemo(() => {
+    const searchTerms = searchQuery.trim().split(/\s+/).filter(Boolean);
+
     return products.filter((product) => {
       if (!isMedicineProduct(product)) return false;
+
+      if (searchTerms.length > 0) {
+        const text = `${product.name} ${product.composition || ''} ${(product.tags || []).join(' ')} ${product.category_id} ${product.manufacturer || ''} ${product.sku || ''}`.toLowerCase();
+        const matchesSearch = searchTerms.every((t) => text.includes(t));
+        if (!matchesSearch) return false;
+      }
 
       if (currentFilter === 'all') return true;
       if (currentFilter === 'prescription') return product.requires_prescription;
@@ -65,7 +87,7 @@ function MedicinesContent() {
       }
       return product.category_id === currentFilter;
     });
-  }, [products, currentFilter, isMedicineProduct]);
+  }, [products, currentFilter, isMedicineProduct, searchQuery]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -79,19 +101,24 @@ function MedicinesContent() {
       </nav>
 
       {/* Hero Banner for Pharmacy Department */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#005AD2] via-[#0066E8] to-[#004BB8] p-6 sm:p-10 text-white shadow-card mb-8">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#005AD2] via-[#0066E8] to-[#004BB8] p-6 sm:p-8 text-white shadow-card mb-8">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-300/20 via-transparent to-transparent pointer-events-none" />
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-blue-100 backdrop-blur-sm mb-3">
-            <Pill className="h-3.5 w-3.5" />
-            <span>CLINICAL PHARMACY & DISPENSARY</span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="max-w-xl">
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+              Quality Clinical Medicines & First Aid
+            </h1>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            Quality Clinical Medicines & First Aid
-          </h1>
-          <p className="mt-2 text-sm sm:text-base text-blue-100 leading-relaxed">
-            Authentic OTC essentials, temperature-controlled therapeutics, and prescription medicines. All formulations are verified by licensed pharmacists.
-          </p>
+          <div className="relative shrink-0 w-full md:w-72 lg:w-80 h-44 sm:h-48 md:h-40 rounded-2xl overflow-hidden shadow-lg border-2 border-white/20">
+            <Image
+              src="/hero-poster-medicines.jpg"
+              alt="Quality Clinical Medicines & First Aid"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 320px"
+              priority
+            />
+          </div>
         </div>
       </div>
 
@@ -115,19 +142,71 @@ function MedicinesContent() {
         })}
       </div>
 
-      {/* Products Counter */}
-      <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-500">
-          Showing <span className="font-bold text-navy">{medicineProducts.length}</span> verified medicines
-        </p>
-        {currentFilter !== 'all' && (
-          <Link
-            href="/medicines"
-            className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-          >
-            <span>Reset filters</span>
-          </Link>
-        )}
+      {/* Search and Products Counter Bar */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-gray-500">
+            Showing <span className="font-bold text-navy">{medicineProducts.length}</span> verified medicines
+            {searchQuery && (
+              <span className="ml-1 text-primary">
+                matching &ldquo;{searchQuery}&rdquo;
+              </span>
+            )}
+          </p>
+          {(currentFilter !== 'all' || searchQuery) && (
+            <Link
+              href="/medicines"
+              className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 mt-0.5"
+            >
+              <span>Reset all filters</span>
+            </Link>
+          )}
+        </div>
+
+        {/* Medicines Search Form */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const input = form.elements.namedItem('medicineSearch') as HTMLInputElement;
+            const val = input.value.trim();
+            const params = new URLSearchParams(searchParams.toString());
+            if (val) {
+              params.set('search', val);
+            } else {
+              params.delete('search');
+            }
+            router.push(`/medicines?${params.toString()}`);
+          }}
+          className="relative w-full sm:w-80"
+        >
+          <div className="relative flex items-center">
+            <Filter className="absolute left-3.5 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+            <input
+              name="medicineSearch"
+              type="text"
+              defaultValue={searchQuery}
+              key={searchQuery}
+              placeholder="Search by salt, brand, or disease..."
+              className="w-full h-10 rounded-2xl border border-border bg-white pl-9 pr-20 text-xs sm:text-sm text-navy placeholder:text-gray-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            />
+            {searchQuery && (
+              <Link
+                href={currentFilter !== 'all' ? `/medicines?filter=${currentFilter}` : '/medicines'}
+                className="absolute right-12 p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+                title="Clear search"
+              >
+                &times;
+              </Link>
+            )}
+            <button
+              type="submit"
+              className="absolute right-1.5 h-7 px-2.5 rounded-xl bg-primary text-[11px] font-bold text-white hover:bg-primary-hover transition-colors shadow-2xs"
+            >
+              Search
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Product Grid */}

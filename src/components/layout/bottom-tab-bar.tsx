@@ -14,6 +14,13 @@ export function BottomTabBar() {
   const { t } = useTranslation();
   const mounted = useIsMounted();
   const cartCount = mounted ? getItemCount() : 0;
+  const [navigatingHref, setNavigatingHref] = React.useState<string | null>(null);
+
+  const [prevPathname, setPrevPathname] = React.useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setNavigatingHref(null);
+  }
 
   const tabs = [
     { href: '/', label: t('home', 'Home'), icon: Home, match: '/' },
@@ -30,18 +37,24 @@ export function BottomTabBar() {
       aria-label="Main navigation"
     >
       <div className="grid grid-cols-5">
-        {tabs.map((tab) => {
+        {tabs.map((tab, index) => {
           const isActive = pathname === tab.match || (tab.match !== '/' && pathname.startsWith(tab.match + '/'));
+          const isPending = navigatingHref === tab.href && !isActive;
           const Icon = tab.icon;
 
           return (
             <Link
-              key={tab.label}
+              key={tab.href + '-' + index}
               href={tab.href}
               prefetch={true}
+              onClick={() => {
+                if (!isActive) setNavigatingHref(tab.href);
+              }}
               className={cn(
                 'relative flex flex-col items-center justify-center gap-1 px-2 py-2.5 text-xs font-medium transition-colors',
                 isActive
+                  ? 'text-primary'
+                  : isPending
                   ? 'text-primary'
                   : 'text-gray-600 active:text-gray-900'
               )}

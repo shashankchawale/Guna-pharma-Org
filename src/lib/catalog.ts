@@ -541,7 +541,7 @@ const realProductsSeed: RealProductSeed[] = [
 ];
 
 export const products: Product[] = realProductsSeed.map((p, index) => ({
-  id: `product-${index + 1}`,
+  id: p.slug,
   slug: p.slug,
   name: p.name,
   category_id: p.category_id,
@@ -582,18 +582,73 @@ const globalScope = globalThis as unknown as {
   __GUNA_DELETED_PRODUCT_IDS__?: string[];
 };
 
+function getFsPersistedState(): { deleted: string[]; custom: Product[] } {
+  let deleted: string[] = [];
+  let custom: Product[] = [];
+  if (typeof window === 'undefined') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const dataDir = path.join(process.cwd(), '.data');
+      const delFile = path.join(dataDir, 'deleted_products.json');
+      const custFile = path.join(dataDir, 'custom_products.json');
+      if (fs.existsSync(delFile)) {
+        const parsed = JSON.parse(fs.readFileSync(delFile, 'utf-8'));
+        if (Array.isArray(parsed)) deleted = parsed;
+      }
+      if (fs.existsSync(custFile)) {
+        const parsed = JSON.parse(fs.readFileSync(custFile, 'utf-8'));
+        if (Array.isArray(parsed)) custom = parsed;
+      }
+    } catch {}
+  }
+  return { deleted, custom };
+}
+
 export function getAllProducts(): Product[] {
-  const custom = globalScope.__GUNA_CUSTOM_PRODUCTS__ || [];
-  const deletedIds = globalScope.__GUNA_DELETED_PRODUCT_IDS__ || [];
-  const filteredSeed = products.filter(
-    (p) => !deletedIds.includes(p.id) && !custom.some((c) => c.id === p.id)
-  );
-  return [...custom, ...filteredSeed];
+  const { deleted: diskDeleted, custom: diskCustom } = getFsPersistedState();
+  const memoryCustom = globalScope.__GUNA_CUSTOM_PRODUCTS__ || [];
+
+  const customMap = new Map<string, Product>();
+  for (const p of diskCustom) {
+    if (p && p.id) customMap.set(p.id, p);
+  }
+  for (const p of memoryCustom) {
+    if (p && p.id) customMap.set(p.id, p);
+  }
+  const custom = Array.from(customMap.values());
+
+  const memoryDeleted = globalScope.__GUNA_DELETED_PRODUCT_IDS__ || [];
+  const deletedIds = Array.from(new Set([...diskDeleted, ...memoryDeleted])).map((d) => d.toLowerCase());
+
+  const filteredCustom = custom.filter((p) => {
+    const idLower = (p.id || '').toLowerCase();
+    const slugLower = (p.slug || '').toLowerCase();
+    return !deletedIds.includes(idLower) && !deletedIds.includes(slugLower);
+  });
+
+  const filteredSeed = products.filter((p) => {
+    const idLower = (p.id || '').toLowerCase();
+    const slugLower = (p.slug || '').toLowerCase();
+    if (deletedIds.includes(idLower) || deletedIds.includes(slugLower)) {
+      return false;
+    }
+    return !filteredCustom.some((c) => c.id === p.id || c.slug === p.slug);
+  });
+
+  return [...filteredCustom, ...filteredSeed];
 }
 
 export function getProduct(slug: string): Product | undefined {
   const all = getAllProducts();
-  return all.find((p) => p.slug === slug || p.id === slug);
+  const slugLower = slug.toLowerCase();
+  return all.find(
+    (p) =>
+      p.slug === slug ||
+      p.id === slug ||
+      p.slug?.toLowerCase() === slugLower ||
+      p.id?.toLowerCase() === slugLower
+  );
 }
 
 export function addServerProduct(p: Product): Product {
@@ -627,12 +682,51 @@ export function deleteServerProduct(id: string): void {
   if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__) {
     globalScope.__GUNA_DELETED_PRODUCT_IDS__ = [];
   }
-  if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__.includes(id)) {
-    globalScope.__GUNA_DELETED_PRODUCT_IDS__.push(id);
+  const idStr = String(id).trim();
+  const idLower = idStr.toLowerCase();
+
+  if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__.includes(idStr)) {
+    globalScope.__GUNA_DELETED_PRODUCT_IDS__.push(idStr);
   }
+  if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__.includes(idLower)) {
+    globalScope.__GUNA_DELETED_PRODUCT_IDS__.push(idLower);
+  }
+
+  // Also check if any seed matches this id or slug
+  const matchingSeed = products.find(
+    (p) =>
+      p.id === idStr ||
+      p.slug === idStr ||
+      p.id.toLowerCase() === idLower ||
+      p.slug.toLowerCase() === idLower
+  );
+  if (matchingSeed) {
+    if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__.includes(matchingSeed.id)) {
+      globalScope.__GUNA_DELETED_PRODUCT_IDS__.push(matchingSeed.id);
+    }
+    if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__.includes(matchingSeed.slug)) {
+      globalScope.__GUNA_DELETED_PRODUCT_IDS__.push(matchingSeed.slug);
+    }
+    if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__.includes(matchingSeed.id.toLowerCase())) {
+      globalScope.__GUNA_DELETED_PRODUCT_IDS__.push(matchingSeed.id.toLowerCase());
+    }
+    if (!globalScope.__GUNA_DELETED_PRODUCT_IDS__.includes(matchingSeed.slug.toLowerCase())) {
+      globalScope.__GUNA_DELETED_PRODUCT_IDS__.push(matchingSeed.slug.toLowerCase());
+    }
+  }
+
   if (globalScope.__GUNA_CUSTOM_PRODUCTS__) {
     globalScope.__GUNA_CUSTOM_PRODUCTS__ = globalScope.__GUNA_CUSTOM_PRODUCTS__.filter(
-      (p) => p.id !== id
+      (p) =>
+        p.id !== idStr &&
+        p.slug !== idStr &&
+        p.id?.toLowerCase() !== idLower &&
+        p.slug?.toLowerCase() !== idLower
     );
   }
 }
+
+export function restoreAllServerProducts(): void {
+  globalScope.__GUNA_DELETED_PRODUCT_IDS__ = [];
+}
+

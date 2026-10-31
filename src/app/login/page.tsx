@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  KeyRound,
   Loader2,
   Lock,
   Mail,
@@ -201,59 +200,6 @@ function LoginFormContent() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setErrorMsg(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoSignIn = async () => {
-    setErrorMsg(null);
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      // Try demo credentials first
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'customer@gunapharma.com',
-        password: 'Password@123',
-      });
-
-      if (!error && data.user) {
-        setUser(data.user);
-        setSession(data.session);
-        setSuccessMsg('Signed in as Demo User! Redirecting...');
-        setTimeout(() => router.push(redirectPath), 600);
-      } else {
-        // If not created yet in Supabase, create it or fallback to mock user
-        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-          email: 'customer@gunapharma.com',
-          password: 'Password@123',
-          options: {
-            data: { full_name: 'Dr. Rahul Sharma' },
-          },
-        });
-
-        if (!signUpErr && signUpData.user) {
-          setUser(signUpData.user);
-          if (signUpData.session) setSession(signUpData.session);
-          setSuccessMsg('Signed in as Demo User! Redirecting...');
-          setTimeout(() => router.push(redirectPath), 600);
-        } else {
-          // Provide instant local demo session
-          setUser({
-            id: 'demo-user-123',
-            app_metadata: {},
-            user_metadata: { full_name: 'Dr. Rahul Sharma' },
-            aud: 'authenticated',
-            created_at: new Date().toISOString(),
-            email: 'customer@gunapharma.com',
-          } as unknown as typeof user);
-          setSuccessMsg('Signed in as Demo Customer! Redirecting...');
-          setTimeout(() => router.push(redirectPath), 600);
-        }
-      }
-    } catch {
-      setSuccessMsg('Signed in as Demo Customer! Redirecting...');
-      setTimeout(() => router.push(redirectPath), 600);
     } finally {
       setLoading(false);
     }
@@ -469,27 +415,6 @@ function LoginFormContent() {
             )}
           </button>
         </form>
-
-        {/* Divider */}
-        <div className="relative my-6 text-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <span className="relative bg-white px-3 text-xs uppercase text-gray-400 font-semibold tracking-wider">
-            Or quick access
-          </span>
-        </div>
-
-        {/* Demo Account Button */}
-        <button
-          type="button"
-          onClick={handleDemoSignIn}
-          disabled={loading}
-          className="w-full h-11 rounded-xl border border-border bg-slate-50 text-xs font-bold text-navy hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
-        >
-          <KeyRound className="h-4 w-4 text-primary" />
-          <span>Quick Sign In as Demo Customer</span>
-        </button>
 
         {/* Security Assurance */}
         <p className="mt-6 text-center text-[11px] text-gray-400">

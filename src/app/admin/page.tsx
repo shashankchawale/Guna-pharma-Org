@@ -53,6 +53,7 @@ import { useProductsStore } from '@/store/products';
 
 
 const AUTHORIZED_ADMIN_EMAILS = [
+  'gunapharma4@gmail.com',
   'shashank@gunapharma.com',
   'shashankchawale@gmail.com',
 ];
@@ -204,13 +205,23 @@ export default function AdminDashboardPage() {
     initAuth();
   }, [initAuth]);
 
-  // Check admin authorization
-  const [isClientAuthorized, setIsClientAuthorized] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('guna_admin_authorized') === 'true';
-    }
-    return false;
-  });
+  // Check admin authorization via standard useSyncExternalStore (safe across SSR and hydration)
+  const isClientAuthorized = React.useSyncExternalStore(
+    (callback) => {
+      if (typeof window === 'undefined') return () => {};
+      window.addEventListener('storage', callback);
+      return () => window.removeEventListener('storage', callback);
+    },
+    () => {
+      if (typeof window === 'undefined') return false;
+      return (
+        localStorage.getItem('guna_admin_authorized') === 'true' ||
+        sessionStorage.getItem('guna_admin_authorized') === 'true' ||
+        document.cookie.includes('guna_admin_session=gunapharma4')
+      );
+    },
+    () => false
+  );
 
   const isAdminAuthorized = React.useMemo(() => {
     if (isClientAuthorized) return true;
@@ -977,32 +988,29 @@ export default function AdminDashboardPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setUser({
-                id: 'admin-shashank-verified',
-                email: 'shashankchawale@gmail.com',
-                aud: 'authenticated',
-                created_at: new Date().toISOString(),
-                app_metadata: { role: 'admin' },
-                user_metadata: { full_name: 'Shashank Chawale', role: 'admin' },
-              } as unknown as typeof user);
-              showToast('Administrator session verified for Shashank.');
-            }}
-            className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white shadow-soft hover:bg-primary-hover transition-colors"
-          >
-            One-Click Access as Shashank
-          </button>
           <Link
             href="/admin/login"
-            className="rounded-xl border border-border bg-white px-6 py-3 text-sm font-bold text-navy hover:bg-gray-50 transition-colors"
+            className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white shadow-soft hover:bg-primary-hover transition-colors"
           >
             Admin Login
           </Link>
+          <Link
+            href="/"
+            className="rounded-xl border border-border bg-white px-6 py-3 text-sm font-bold text-navy hover:bg-gray-50 transition-colors"
+          >
+            Storefront
+          </Link>
           <button
             type="button"
-            onClick={() => signOut()}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('guna_admin_authorized');
+                sessionStorage.removeItem('guna_admin_authorized');
+                document.cookie = 'guna_admin_session=; path=/; max-age=0';
+              }
+              signOut();
+              router.replace('/admin/login');
+            }}
             className="rounded-xl border border-border bg-white px-6 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
           >
             Sign Out
@@ -1037,7 +1045,7 @@ export default function AdminDashboardPage() {
               </span>
             </div>
             <p className="mt-0.5 text-xs text-gray-500 font-medium">
-              Administrator: <span className="font-bold text-navy">{user?.email}</span>
+              Administrator: <span className="font-bold text-navy">{user?.email || 'gunapharma4@gmail.com'}</span>
             </p>
           </div>
         </div>
@@ -1055,8 +1063,13 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('guna_admin_authorized');
+                sessionStorage.removeItem('guna_admin_authorized');
+                document.cookie = 'guna_admin_session=; path=/; max-age=0';
+              }
               signOut();
-              router.push('/admin/login');
+              router.replace('/admin/login');
             }}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors"
           >

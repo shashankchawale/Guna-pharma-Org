@@ -198,14 +198,13 @@ export async function upsertSupabaseProduct(product: Product): Promise<{ success
 export async function deleteSupabaseProduct(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabaseClient();
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .or(`id.eq.${id},slug.eq.${id}`);
+    const idTrimmed = String(id).trim();
+    const { error: err1 } = await supabase.from('products').delete().eq('id', idTrimmed);
+    const { error: err2 } = await supabase.from('products').delete().eq('slug', idTrimmed);
 
-    if (error) {
-      console.warn('Could not delete from Supabase products:', error.message);
-      return { success: false, error: error.message };
+    if (err1 && err2) {
+      console.warn('Could not delete from Supabase products:', err1.message || err2.message);
+      return { success: false, error: err1.message || err2.message };
     }
     return { success: true };
   } catch (err: any) {

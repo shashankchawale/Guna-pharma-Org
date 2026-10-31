@@ -147,11 +147,19 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Missing product ID or slug' }, { status: 400 });
     }
 
-    if (id) deleteServerProduct(id);
-    if (slug && slug !== id) deleteServerProduct(slug);
+    let supabaseDeleted = false;
+    if (id) {
+      deleteServerProduct(id);
+      const res = await deleteSupabaseProduct(id);
+      if (res.success) supabaseDeleted = true;
+    }
+    if (slug && slug !== id) {
+      deleteServerProduct(slug);
+      await deleteSupabaseProduct(slug);
+    }
 
     return NextResponse.json(
-      { success: true, deletedId: id || slug },
+      { success: true, deletedId: id || slug, supabaseDeleted },
       {
         status: 200,
         headers: {

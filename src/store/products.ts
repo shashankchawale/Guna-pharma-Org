@@ -78,6 +78,40 @@ interface ProductsState {
   clearError: () => void;
 }
 
+const safeStorage = {
+  getItem: (name: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(name, value);
+    } catch (err: any) {
+      console.warn('LocalStorage save warning, cleaning legacy cache:', err?.message);
+      try {
+        localStorage.removeItem('guna_products_store');
+        localStorage.removeItem('guna_products_store_v1');
+        localStorage.removeItem('guna_products_store_v2');
+        localStorage.setItem(name, value);
+      } catch {
+        // Safely swallow quota error so the app continues running with in-memory state & Supabase
+        console.warn('LocalStorage full: keeping products active in memory and syncing directly to Supabase.');
+      }
+    }
+  },
+  removeItem: (name: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem(name);
+    } catch {}
+  },
+};
+
 let lastSyncTimestamp = 0;
 let inFlightSyncPromise: Promise<void> | null = null;
 
@@ -298,11 +332,35 @@ export const useProductsStore = create<ProductsState>()(
       },
     }),
     {
-      name: 'guna_products_store_v3',
-      storage: createJSONStorage(() => localStorage),
+      name: 'guna_products_store_v4',
+      storage: createJSONStorage(() => safeStorage),
+      partialize: (state) => ({
+        deletedProductIds: state.deletedProductIds,
+        products: state.products.map((p) => {
+          // If image is a large data URL, replace it in localStorage with a placeholder to avoid exceeding browser quota
+          const isLargeData = (url?: string) => typeof url === 'string' && url.startsWith('data:') && url.length > 2000;
+          const fallback = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80';
+          return {
+            ...p,
+            images: p.images?.map((img) => (isLargeData(img) ? fallback : img)),
+            thumbnail_url: isLargeData(p.thumbnail_url) ? fallback : p.thumbnail_url,
+            image_url: isLargeData(p.image_url) ? fallback : p.image_url,
+          };
+        }),
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setIsHydrated(true);
+
+          if (typeof window !== 'undefined') {
+            try {
+              // Clean up all legacy storage caches to free up browser quota
+              localStorage.removeItem('guna_products_store');
+              localStorage.removeItem('guna_products_store_v1');
+              localStorage.removeItem('guna_products_store_v2');
+              localStorage.removeItem('guna_products_store_v3');
+            } catch {}
+          }
 
           let deletedIds = state.deletedProductIds || [];
           if (typeof window !== 'undefined') {
@@ -317,40 +375,11 @@ export const useProductsStore = create<ProductsState>()(
             } catch {}
           }
 
-          // Migrate legacy stores if needed
-          if (typeof window !== 'undefined') {
-            try {
-              const v2 = localStorage.getItem('guna_products_store_v2');
-              const v1 = localStorage.getItem('guna_products_store');
-              const oldItems: Product[] = [];
-              if (v2) {
-                const p = JSON.parse(v2);
-                if (Array.isArray(p?.state?.products)) oldItems.push(...p.state.products);
-              }
-              if (v1) {
-                const p = JSON.parse(v1);
-                if (Array.isArray(p?.state?.products)) oldItems.push(...p.state.products);
-              }
+          state.setProducts(mergeCatalogProducts(state.products, deletedIds));
+          useProductsStore.setState({ deletedProductIds: deletedIds });
 
-              const customOnly = oldItems.filter(
-                (p) => p.id && p.id.startsWith('prod-')
-              );
-              const merged = mergeCatalogProducts(
-                [...customOnly, ...state.products],
-                deletedIds
-              );
-              state.setProducts(merged);
-              useProductsStore.setState({ deletedProductIds: deletedIds });
-            } catch {
-              state.setProducts(mergeCatalogProducts(state.products, deletedIds));
-              useProductsStore.setState({ deletedProductIds: deletedIds });
-            }
-          } else {
-            state.setProducts(mergeCatalogProducts(state.products, deletedIds));
-          }
-
-          // Trigger server sync
-          state.syncWithServer();
+          // Trigger live server sync
+          state.syncWithServer(true);
         }
       },
     }

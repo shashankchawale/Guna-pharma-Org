@@ -294,16 +294,57 @@ export default function AdminDashboardPage() {
   const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image size should be under 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Image size should be under 10MB');
       return;
     }
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;
       if (result) {
-        setFormImageUrl(result);
-        showToast('Product photo uploaded from device!');
+        // Compress image using canvas before storing to keep sizes small (< 60KB) and prevent quota errors
+        try {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_DIM = 600;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_DIM) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              }
+            } else {
+              if (height > MAX_DIM) {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              const compressed = canvas.toDataURL('image/jpeg', 0.82);
+              setFormImageUrl(compressed);
+              showToast('Product photo optimized and loaded!');
+            } else {
+              setFormImageUrl(result);
+              showToast('Product photo uploaded from device!');
+            }
+          };
+          img.onerror = () => {
+            setFormImageUrl(result);
+            showToast('Product photo uploaded from device!');
+          };
+          img.src = result;
+        } catch {
+          setFormImageUrl(result);
+          showToast('Product photo uploaded from device!');
+        }
       }
     };
     reader.readAsDataURL(file);

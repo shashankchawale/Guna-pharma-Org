@@ -20,6 +20,28 @@ export default function QuotePage() {
     setLoading(true);
 
     try {
+      const newQuoteRecord = {
+        id: `quote-${Date.now()}`,
+        full_name: fullName,
+        company: company || null,
+        email,
+        country,
+        quantity: quantity || null,
+        phone: phone || null,
+        details,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+
+      // Save locally for instant admin sync
+      if (typeof window !== 'undefined') {
+        try {
+          const existing = JSON.parse(localStorage.getItem('guna_local_quotes') || '[]');
+          const updated = [newQuoteRecord, ...(Array.isArray(existing) ? existing : [])];
+          localStorage.setItem('guna_local_quotes', JSON.stringify(updated));
+        } catch {}
+      }
+
       const supabase = createClient();
       const { error: insertError } = await supabase.from('quotes').insert({
         full_name: fullName,

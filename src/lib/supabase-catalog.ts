@@ -24,9 +24,8 @@ export interface SupabaseHealth {
 export async function checkSupabaseHealth(): Promise<SupabaseHealth> {
   try {
     const supabase = getSupabaseClient();
-    const { data, error, count } = await supabase
-      .from('products')
-      .select('id', { count: 'exact', head: true });
+    // Do a real 1-row select query to accurately determine if public.products exists in schema cache
+    const { error } = await supabase.from('products').select('id').limit(1);
 
     if (error) {
       const isMissingTable =
@@ -43,10 +42,15 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealth> {
       };
     }
 
+    // If query succeeded, table exists; now query the exact product count
+    const { count } = await supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true });
+
     return {
       connected: true,
       tableExists: true,
-      productCount: count ?? (Array.isArray(data) ? data.length : 0),
+      productCount: count ?? 0,
       url: SUPABASE_URL,
     };
   } catch (err: any) {
@@ -139,7 +143,7 @@ export async function fetchSupabaseProducts(): Promise<Product[] | null> {
   }
 }
 
-export async function upsertSupabaseProduct(product: Product): Promise<boolean> {
+export async function upsertSupabaseProduct(product: Product): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabaseClient();
     const row = {
@@ -147,24 +151,34 @@ export async function upsertSupabaseProduct(product: Product): Promise<boolean> 
       name: product.name,
       slug: product.slug || product.id,
       category_id: product.category_id || (typeof product.category === 'string' ? product.category : 'medicines'),
+      category: typeof product.category === 'string' ? product.category : product.category_id || 'medicines',
       brand_id: product.brand_id || 'guna-pharma',
       mrp: product.mrp,
       selling_price: product.selling_price || product.price || product.mrp,
       discount_percent: product.discount_percent ?? product.discount ?? 0,
-      stock_quantity: product.stock_quantity ?? 0,
+      stock_quantity: product.stock_quantity ?? 50,
+      low_stock_threshold: product.low_stock_threshold ?? 10,
       sku: product.sku || `GP-${product.id}`,
       thumbnail_url: product.thumbnail_url || product.image_url,
+      image_url: product.image_url || product.thumbnail_url,
       images: product.images || [product.image_url || product.thumbnail_url || ''],
       requires_prescription: Boolean(product.requires_prescription),
+      prescription_notes: product.prescription_notes || '',
+      composition: product.composition || '',
+      usage_instructions: product.usage_instructions || '',
+      warnings: product.warnings || '',
+      storage_instructions: product.storage_instructions || '',
       short_description: product.short_description || '',
       description: product.description || '',
-      composition: product.composition || '',
       manufacturer: product.manufacturer || 'GUNA PHARMA',
+      country_of_origin: product.country_of_origin || 'India',
       is_active: product.is_active ?? true,
       is_available: product.is_available ?? (product.stock_quantity > 0),
       is_featured: product.is_featured ?? false,
-      rating_average: product.rating_average ?? 4.5,
-      rating_count: product.rating_count ?? 10,
+      rating_average: product.rating_average ?? 4.7,
+      rating_count: product.rating_count ?? 15,
+      view_count: product.view_count ?? 100,
+      sold_count: product.sold_count ?? 20,
       tags: product.tags || [],
       updated_at: new Date().toISOString(),
     };
@@ -172,16 +186,16 @@ export async function upsertSupabaseProduct(product: Product): Promise<boolean> 
     const { error } = await supabase.from('products').upsert(row, { onConflict: 'id' });
     if (error) {
       console.warn('Could not upsert into Supabase products:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.warn('Supabase upsert exception:', err);
-    return false;
+    return { success: false, error: err?.message || 'Upsert failed' };
   }
 }
 
-export async function deleteSupabaseProduct(id: string): Promise<boolean> {
+export async function deleteSupabaseProduct(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabaseClient();
     const { error } = await supabase
@@ -191,11 +205,67 @@ export async function deleteSupabaseProduct(id: string): Promise<boolean> {
 
     if (error) {
       console.warn('Could not delete from Supabase products:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.warn('Supabase delete exception:', err);
-    return false;
+    return { success: false, error: err?.message || 'Delete failed' };
+  }
+}
+
+export async function syncAllProductsToSupabase(products: Product[]): Promise<{
+  success: boolean;
+  syncedCount: number;
+  error?: string;
+}> {
+  try {
+    const supabase = getSupabaseClient();
+    const rows = products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      slug: product.slug || product.id,
+      category_id: product.category_id || (typeof product.category === 'string' ? product.category : 'medicines'),
+      category: typeof product.category === 'string' ? product.category : product.category_id || 'medicines',
+      brand_id: product.brand_id || 'guna-pharma',
+      mrp: product.mrp,
+      selling_price: product.selling_price || product.price || product.mrp,
+      discount_percent: product.discount_percent ?? product.discount ?? 0,
+      stock_quantity: product.stock_quantity ?? 50,
+      low_stock_threshold: product.low_stock_threshold ?? 10,
+      sku: product.sku || `GP-${product.id}`,
+      thumbnail_url: product.thumbnail_url || product.image_url,
+      image_url: product.image_url || product.thumbnail_url,
+      images: product.images || [product.image_url || product.thumbnail_url || ''],
+      requires_prescription: Boolean(product.requires_prescription),
+      prescription_notes: product.prescription_notes || '',
+      composition: product.composition || '',
+      usage_instructions: product.usage_instructions || '',
+      warnings: product.warnings || '',
+      storage_instructions: product.storage_instructions || '',
+      short_description: product.short_description || '',
+      description: product.description || '',
+      manufacturer: product.manufacturer || 'GUNA PHARMA',
+      country_of_origin: product.country_of_origin || 'India',
+      is_active: product.is_active ?? true,
+      is_available: product.is_available ?? (product.stock_quantity > 0),
+      is_featured: product.is_featured ?? false,
+      rating_average: product.rating_average ?? 4.7,
+      rating_count: product.rating_count ?? 15,
+      view_count: product.view_count ?? 100,
+      sold_count: product.sold_count ?? 20,
+      tags: product.tags || [],
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase.from('products').upsert(rows, { onConflict: 'id' });
+    if (error) {
+      console.warn('Could not sync products to Supabase:', error);
+      return { success: false, syncedCount: 0, error: error.message };
+    }
+    return { success: true, syncedCount: rows.length };
+  } catch (err: any) {
+    console.warn('Supabase sync exception:', err);
+    return { success: false, syncedCount: 0, error: err?.message || 'Sync failed' };
   }
 }

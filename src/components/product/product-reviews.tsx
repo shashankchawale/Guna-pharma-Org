@@ -58,18 +58,22 @@ export function ProductReviews({ product }: ProductReviewsProps) {
     },
   ], [product.name]);
 
-  const [reviews, setReviews] = React.useState<UserReview[]>(() => {
-    if (typeof window !== 'undefined') {
+  const [reviews, setReviews] = React.useState<UserReview[]>(defaultReviews);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
       try {
         const stored = localStorage.getItem(`reviews_${product.id}`);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setReviews(parsed);
+          }
         }
       } catch {}
-    }
-    return defaultReviews;
-  });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [product.id]);
 
   const [selectedRatingFilter, setSelectedRatingFilter] = React.useState<number | null>(null);
   const [showReviewModal, setShowReviewModal] = React.useState(false);

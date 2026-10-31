@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getLiveCatalogProducts,
+  getServerProducts,
   addServerProduct,
   updateServerProduct,
   deleteServerProduct,
   restoreAllServerProducts,
 } from '@/lib/server-catalog';
-import { checkSupabaseHealth } from '@/lib/supabase-catalog';
+import {
+  checkSupabaseHealth,
+  syncAllProductsToSupabase,
+  upsertSupabaseProduct,
+  deleteSupabaseProduct,
+} from '@/lib/supabase-catalog';
 import type { Product } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -71,15 +77,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'All deleted products restored' }, { status: 200 });
     }
 
+    if (searchParams.get('action') === 'seed_supabase') {
+      const all = getServerProducts([]);
+      const result = await syncAllProductsToSupabase(all);
+      return NextResponse.json(result, { status: result.success ? 200 : 400 });
+    }
+
     const product: Product = await req.json();
     if (!product || !product.id || !product.name) {
       return NextResponse.json({ error: 'Invalid product data: id and name are required' }, { status: 400 });
     }
     const added = addServerProduct(product);
-    return NextResponse.json(added, { status: 201 });
-  } catch (error) {
+    const supabaseRes = await upsertSupabaseProduct(added);
+
+    return NextResponse.json(
+      {
+        ...added,
+        supabaseSynced: supabaseRes.success,
+        supabaseError: supabaseRes.error,
+      },
+      { status: 201 }
+    );
+  } catch (error: any) {
     console.error('Error adding product:', error);
-    return NextResponse.json({ error: 'Failed to add product' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to add product', details: error?.message }, { status: 500 });
   }
 }
 
@@ -90,10 +111,19 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid product data: id is required' }, { status: 400 });
     }
     const updated = updateServerProduct(product);
-    return NextResponse.json(updated, { status: 200 });
-  } catch (error) {
+    const supabaseRes = await upsertSupabaseProduct(updated);
+
+    return NextResponse.json(
+      {
+        ...updated,
+        supabaseSynced: supabaseRes.success,
+        supabaseError: supabaseRes.error,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
     console.error('Error updating product:', error);
-    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update product', details: error?.message }, { status: 500 });
   }
 }
 

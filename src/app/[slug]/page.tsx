@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 const pages: Record<string, { title: string; text: string }> = {
   about: {
     title: 'About GUNA PHARMA',
-    text: 'We make everyday health and beauty shopping clearer, more convenient, and more trustworthy.',
+    text: 'We make everyday health and beauty shopping clearer, more convenient, and more trustworthy with genuine pharmaceutical formulations and verified skincare essentials.',
   },
   contact: {
     title: 'Contact us',
@@ -12,7 +12,7 @@ const pages: Record<string, { title: string; text: string }> = {
   },
   faq: {
     title: 'Frequently asked questions',
-    text: 'Find answers about deliveries, returns, prescriptions, and ordering with GUNA PHARMA.',
+    text: 'Find answers about deliveries, returns, prescriptions, international transit, and ordering with GUNA PHARMA. For specific dosage or clinical inquiries, our licensed pharmacists are on standby.',
   },
   'privacy-policy': {
     title: 'Privacy policy',
@@ -28,11 +28,47 @@ const pages: Record<string, { title: string; text: string }> = {
   },
   'shipping-policy': {
     title: 'Shipping policy',
-    text: 'Orders are generally dispatched in 1–2 business days. Delivery timing varies by serviceable pincode.',
+    text: 'Orders are generally dispatched in 1–2 business days in secure, tamper-evident packaging. Delivery timing varies by serviceable destination and local postal customs.',
   },
   'refund-policy': {
     title: 'Return & refund policy',
-    text: 'Eligible non-prescription products may be returned within 7 days in accordance with our returns policy. Prescription products cannot be returned once supplied.',
+    text: 'Eligible non-prescription products may be returned within 7 days in accordance with our returns policy. Prescription therapeutics cannot be returned once supplied.',
+  },
+  'cookie-policy': {
+    title: 'Cookie policy',
+    text: 'GUNA PHARMA uses essential and preference cookies to retain your shopping basket, remember your regional currency, and ensure a secure browsing experience.',
+  },
+  licenses: {
+    title: 'Licenses & certifications',
+    text: 'GUNA PHARMA operates in strict compliance with certified Good Distribution Practice (GDP) standards, licensed drug distribution permits, and verified supplier certifications.',
+  },
+  careers: {
+    title: 'Careers at GUNA PHARMA',
+    text: 'Join our rapidly growing international healthcare distribution network. We are always looking for passionate pharmacists, supply-chain specialists, and digital healthcare engineers.',
+  },
+  sustainability: {
+    title: 'Sustainability & ethical sourcing',
+    text: 'We are committed to reducing environmental impact through eco-friendly recyclable packaging, temperature-efficient logistics, and ethically sourced botanical and cosmetic ingredients.',
+  },
+  blog: {
+    title: 'Healthcare & wellness insights',
+    text: 'Read our latest clinical updates, dermatological tips, seasonal wellness routines, and pharmacist-reviewed health guides.',
+  },
+  affiliate: {
+    title: 'Affiliate & partner program',
+    text: 'Partner with GUNA PHARMA to provide your patients, clients, or readers with access to authentic healthcare formulations and verified skincare products.',
+  },
+  'size-guide': {
+    title: 'Product dosage & size guide',
+    text: 'Refer to product packaging for specific volume and milligram potencies. For personalized dosage recommendations, always consult your physician or speak with our pharmacist desk.',
+  },
+  press: {
+    title: 'Press & media resources',
+    text: 'For press enquiries, corporate announcements, and media kits regarding GUNA PHARMA international operations, please reach out to our media relations desk at press@gunapharma.com.',
+  },
+  offers: {
+    title: 'Special offers & seasonal promotions',
+    text: 'Explore our latest bundle savings, introductory discounts on new wellness formulations, and exclusive seasonal healthcare deals.',
   },
 };
 

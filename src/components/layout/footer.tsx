@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Globe2, MessageCircle, Send, Video, Mail, Phone, MapPin, Truck, Shield, Star, Headphones, ArrowRight } from 'lucide-react';
+import { Globe2, MessageCircle, Send, Video, Mail, Phone, MapPin, Truck, Shield, Star, Headphones, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { brandConfig } from '@/lib/config';
 
@@ -50,6 +50,15 @@ const trustBadges = [
 ];
 
 export function Footer() {
+  const [newsletterEmail, setNewsletterEmail] = React.useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = React.useState(false);
+
+  const handleNewsletterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) return;
+    setNewsletterSubscribed(true);
+  };
+
   return (
     <footer className="border-t border-[#0C3078] bg-gradient-to-b from-[#0A2660] via-[#071D4A] to-[#041230] text-white" role="contentinfo">
       {/* Trust Badges */}
@@ -278,23 +287,32 @@ export function Footer() {
               <p className="text-sm text-blue-200/85">
                 Subscribe for health tips, exclusive offers & new arrivals
               </p>
-              <form className="flex gap-2" action="/api/newsletter" method="POST">
-                <label htmlFor="footer-email" className="sr-only">Email address</label>
-                <input
-                  id="footer-email"
-                  type="email"
-                  name="email"
-                  placeholder="Enter your email"
-                  className="flex-1 h-11 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-blue-300/60 focus:bg-white focus:text-[#0A2660] focus:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
-                  required
-                />
-                <button
-                  type="submit"
-                  className="flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-[#0A2660] hover:bg-blue-50 transition-colors shadow-md"
-                >
-                  Subscribe
-                </button>
-              </form>
+              {newsletterSubscribed ? (
+                <div className="rounded-xl bg-emerald-500/20 border border-emerald-400/40 p-3 flex items-center gap-2 text-emerald-200 text-xs font-semibold">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
+                  <span>Thank you! You are subscribed to updates.</span>
+                </div>
+              ) : (
+                <form className="flex gap-2" onSubmit={handleNewsletterSubmit}>
+                  <label htmlFor="footer-email" className="sr-only">Email address</label>
+                  <input
+                    id="footer-email"
+                    type="email"
+                    name="email"
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="flex-1 h-11 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-blue-300/60 focus:bg-white focus:text-[#0A2660] focus:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-[#0A2660] hover:bg-blue-50 transition-colors shadow-md shrink-0"
+                  >
+                    Subscribe
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </div>

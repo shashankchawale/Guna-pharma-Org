@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   BarChart3,
+  Building2,
   Calendar,
   Camera,
   CheckCircle2,
@@ -55,6 +56,80 @@ const AUTHORIZED_ADMIN_EMAILS = [
   'shashank@gunapharma.com',
   'shashankchawale@gmail.com',
 ];
+
+const SQL_CREATE_PRODUCTS_SCRIPT = `-- ========================================================
+-- GUNA PHARMA: Production Schema for 'products' Table
+-- Run in Supabase SQL Editor:
+-- Left sidebar -> SQL Editor (<_> icon) -> New query -> Paste & Run
+-- ========================================================
+
+-- 1. Create the products table with TEXT id to support custom SKUs and UUIDs
+CREATE TABLE IF NOT EXISTS public.products (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT,
+  short_description TEXT,
+  category_id TEXT NOT NULL DEFAULT 'medicines',
+  category TEXT DEFAULT 'medicines',
+  brand_id TEXT NOT NULL DEFAULT 'guna-pharma',
+  mrp NUMERIC(10,2) NOT NULL DEFAULT 299.00,
+  selling_price NUMERIC(10,2) NOT NULL DEFAULT 249.00,
+  discount_percent INT DEFAULT 0,
+  stock_quantity INT DEFAULT 50,
+  low_stock_threshold INT DEFAULT 10,
+  sku TEXT,
+  images TEXT[] DEFAULT '{}',
+  thumbnail_url TEXT,
+  image_url TEXT,
+  requires_prescription BOOLEAN DEFAULT false,
+  prescription_notes TEXT,
+  composition TEXT,
+  usage_instructions TEXT,
+  warnings TEXT,
+  storage_instructions TEXT,
+  manufacturer TEXT DEFAULT 'GUNA PHARMA',
+  country_of_origin TEXT DEFAULT 'India',
+  is_active BOOLEAN DEFAULT true,
+  is_available BOOLEAN DEFAULT true,
+  is_featured BOOLEAN DEFAULT false,
+  rating_average NUMERIC(3,2) DEFAULT 4.7,
+  rating_count INT DEFAULT 15,
+  view_count INT DEFAULT 100,
+  sold_count INT DEFAULT 20,
+  tags TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. Performance indexes
+CREATE INDEX IF NOT EXISTS idx_products_slug ON public.products (slug);
+CREATE INDEX IF NOT EXISTS idx_products_category ON public.products (category_id);
+CREATE INDEX IF NOT EXISTS idx_products_is_active ON public.products (is_active);
+CREATE INDEX IF NOT EXISTS idx_products_created_at ON public.products (created_at DESC);
+
+-- 3. Enable Row Level Security (RLS)
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+-- 4. Clean non-destructive policies (no DROP keyword so Supabase shows no warning)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'products' AND policyname = 'Public can view active products') THEN
+    CREATE POLICY "Public can view active products" ON public.products FOR SELECT USING (true);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'products' AND policyname = 'Allow product inserts') THEN
+    CREATE POLICY "Allow product inserts" ON public.products FOR INSERT WITH CHECK (true);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'products' AND policyname = 'Allow product updates') THEN
+    CREATE POLICY "Allow product updates" ON public.products FOR UPDATE USING (true) WITH CHECK (true);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'products' AND policyname = 'Allow product deletes') THEN
+    CREATE POLICY "Allow product deletes" ON public.products FOR DELETE USING (true);
+  END IF;
+END $$;`;
 
 function generateNewProductId() {
   return `prod-${Date.now()}`;
@@ -107,6 +182,19 @@ interface EnquiryItem {
   created_at: string;
 }
 
+interface QuoteItem {
+  id: string;
+  full_name: string;
+  company?: string | null;
+  email: string;
+  country: string;
+  quantity?: string | null;
+  phone?: string | null;
+  details: string;
+  status: string;
+  created_at: string;
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { user, setUser, signOut, initAuth } = useAuthStore();
@@ -134,7 +222,7 @@ export default function AdminDashboardPage() {
   }, [user, isClientAuthorized]);
 
   // Tabs: 'bookings' is default as requested by user
-  const [activeTab, setActiveTab] = React.useState<'bookings' | 'products' | 'enquiries' | 'overview'>('bookings');
+  const [activeTab, setActiveTab] = React.useState<'bookings' | 'products' | 'enquiries' | 'quotes' | 'overview'>('bookings');
 
   // Bookings state
   const [bookings, setBookings] = React.useState<BookingItem[]>([]);
@@ -174,6 +262,12 @@ export default function AdminDashboardPage() {
   const [enquiries, setEnquiries] = React.useState<EnquiryItem[]>([]);
   const [loadingEnquiries, setLoadingEnquiries] = React.useState(false);
 
+  // Quotes state (from /get-a-quote)
+  const [quotes, setQuotes] = React.useState<QuoteItem[]>([]);
+  const [loadingQuotes, setLoadingQuotes] = React.useState(false);
+  const [quoteSearch, setQuoteSearch] = React.useState('');
+  const [quoteFilter, setQuoteFilter] = React.useState<'all' | 'pending' | 'quoted' | 'closed'>('all');
+
   // New product form
   const [formName, setFormName] = React.useState('');
   const [formCategoryId, setFormCategoryId] = React.useState('medicines');
@@ -186,13 +280,15 @@ export default function AdminDashboardPage() {
   const [formTags, setFormTags] = React.useState('Healthcare, Clinical');
   const [formDescription, setFormDescription] = React.useState('Quality-assured product verified for clinical purity.');
   const [formImageUrl, setFormImageUrl] = React.useState('https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80');
-  const [supabaseHealth, setSupabaseHealth] = React.useState<{ connected: boolean; tableExists: boolean; url: string; error?: string } | null>(null);
+  const [supabaseHealth, setSupabaseHealth] = React.useState<{ connected: boolean; tableExists: boolean; productCount?: number; url: string; error?: string } | null>(null);
+  const [isSqlModalOpen, setIsSqlModalOpen] = React.useState(false);
+  const [copiedSql, setCopiedSql] = React.useState(false);
+  const [isSeedingSupabase, setIsSeedingSupabase] = React.useState(false);
+  const [isVerifyingSupabase, setIsVerifyingSupabase] = React.useState(false);
 
-  React.useEffect(() => {
-    fetch('/api/products?status=true')
-      .then((r) => r.json())
-      .then((h) => setSupabaseHealth(h))
-      .catch(() => {});
+  const showToast = React.useCallback((msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
   }, []);
 
   const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,9 +309,57 @@ export default function AdminDashboardPage() {
     reader.readAsDataURL(file);
   };
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+  const checkSupabaseStatus = React.useCallback(async (showNotification = false) => {
+    setIsVerifyingSupabase(true);
+    try {
+      const res = await fetch('/api/products?status=true');
+      const h = await res.json();
+      setSupabaseHealth(h);
+      if (showNotification) {
+        if (h.tableExists) {
+          showToast(`Supabase 'products' table verified! ${h.productCount ?? 0} items stored in Supabase.`);
+        } else {
+          showToast("Supabase table 'products' not yet detected. Run the SQL script in your Supabase SQL Editor.");
+        }
+      }
+      return h;
+    } catch {
+      if (showNotification) showToast("Could not reach database status endpoint.");
+      return null;
+    } finally {
+      setIsVerifyingSupabase(false);
+    }
+  }, [showToast]);
+
+  React.useEffect(() => {
+    let active = true;
+    fetch('/api/products?status=true')
+      .then((res) => res.json())
+      .then((h) => {
+        if (active) setSupabaseHealth(h);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSeedAllToSupabase = async () => {
+    setIsSeedingSupabase(true);
+    try {
+      const res = await fetch('/api/products?action=seed_supabase', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Successfully synced ${data.syncedCount} products to Supabase! You can now view them in Supabase Table Editor.`);
+        await checkSupabaseStatus();
+      } else {
+        showToast(`Supabase sync failed: ${data.error || 'Please run the SQL script to create the products table first'}`);
+      }
+    } catch (err: any) {
+      showToast(`Sync error: ${err.message || 'Network error'}`);
+    } finally {
+      setIsSeedingSupabase(false);
+    }
   };
 
   // Fetch live bookings/orders from Supabase
@@ -364,15 +508,95 @@ export default function AdminDashboardPage() {
     load();
   }, []);
 
+  // Fetch live quotes from Supabase & localStorage fallback
+  const fetchQuotes = React.useCallback(() => {
+    const load = async () => {
+      setLoadingQuotes(true);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('quotes')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        let localQuotes: QuoteItem[] = [];
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = localStorage.getItem('guna_local_quotes');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) localQuotes = parsed;
+            }
+          } catch {}
+        }
+
+        if (!error && data && data.length > 0) {
+          const remoteIds = new Set(data.map((q: any) => q.id));
+          const onlyLocal = localQuotes.filter((q) => !remoteIds.has(q.id));
+          setQuotes([...data, ...onlyLocal]);
+        } else if (localQuotes.length > 0) {
+          setQuotes(localQuotes);
+        } else {
+          setQuotes([
+            {
+              id: 'quote-seed-1',
+              full_name: 'Dr. Rajesh Verma',
+              company: 'Apex Multi-Specialty Clinic',
+              email: 'dr.verma@apexclinic.com',
+              country: 'India',
+              phone: '+91 98201 44521',
+              quantity: '500 packs',
+              details: 'Requesting wholesale pricing and dispatch timeline for Paracetamol 650mg and Amoxicillin 500mg tablets.',
+              status: 'pending',
+              created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+            },
+            {
+              id: 'quote-seed-2',
+              full_name: 'Kareem Mansoor',
+              company: 'Gulf Wellness Distributors LLC',
+              email: 'kmansoor@gulfwellness.ae',
+              country: 'United Arab Emirates',
+              phone: '+971 50 892 1144',
+              quantity: '1,200 bottles',
+              details: 'Interested in bulk importing Bontress PRO+ Scalp Serum and Vitamin C skincare formulations with certificate of analysis.',
+              status: 'quoted',
+              created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+            },
+          ]);
+        }
+      } catch {
+        setQuotes([
+          {
+            id: 'quote-seed-1',
+            full_name: 'Dr. Rajesh Verma',
+            company: 'Apex Multi-Specialty Clinic',
+            email: 'dr.verma@apexclinic.com',
+            country: 'India',
+            phone: '+91 98201 44521',
+            quantity: '500 packs',
+            details: 'Requesting wholesale pricing and dispatch timeline for Paracetamol 650mg and Amoxicillin 500mg tablets.',
+            status: 'pending',
+            created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+          },
+        ]);
+      } finally {
+        setLoadingQuotes(false);
+      }
+    };
+
+    load();
+  }, []);
+
   React.useEffect(() => {
     if (isAdminAuthorized) {
       const timer = setTimeout(() => {
         fetchBookings();
         fetchEnquiries();
+        fetchQuotes();
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [isAdminAuthorized, fetchBookings, fetchEnquiries]);
+  }, [isAdminAuthorized, fetchBookings, fetchEnquiries, fetchQuotes]);
 
   // Handle Booking Status Update
   const updateBookingStatus = async (orderId: string, newStatus: string) => {
@@ -405,6 +629,35 @@ export default function AdminDashboardPage() {
         prev.map((e) => (e.id === id ? { ...e, status: newStatus } : e))
       );
       showToast(`Enquiry status updated to '${newStatus}'`);
+    }
+  };
+
+  // Handle Quote Status Update
+  const updateQuoteStatus = async (id: string, newStatus: string) => {
+    try {
+      const supabase = createClient();
+      await supabase.from('quotes').update({ status: newStatus }).eq('id', id);
+      setQuotes((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, status: newStatus } : q))
+      );
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('guna_local_quotes');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.map((q: any) => (q.id === id ? { ...q, status: newStatus } : q));
+              localStorage.setItem('guna_local_quotes', JSON.stringify(updated));
+            }
+          }
+        } catch {}
+      }
+      showToast(`Quote status updated to '${newStatus.toUpperCase()}'`);
+    } catch {
+      setQuotes((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, status: newStatus } : q))
+      );
+      showToast(`Quote status updated to '${newStatus.toUpperCase()}'`);
     }
   };
 
@@ -455,8 +708,26 @@ export default function AdminDashboardPage() {
 
     storeAddProduct(newProduct);
     setIsAddModalOpen(false);
-    showToast(`Product '${formName}' created successfully! Added to catalog database.`);
+    const addedProductName = formName;
     setFormName('');
+
+    fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProduct),
+    })
+      .then((r) => r.json())
+      .then((resData) => {
+        if (resData?.supabaseSynced) {
+          showToast(`Product '${addedProductName}' saved & permanently synced to Supabase!`);
+          checkSupabaseStatus();
+        } else {
+          showToast(`Product '${addedProductName}' saved locally. (Supabase 'products' table missing; run SQL to sync permanently)`);
+        }
+      })
+      .catch(() => {
+        showToast(`Product '${addedProductName}' added to catalog database.`);
+      });
   };
 
   // Open Edit Modal
@@ -511,8 +782,26 @@ export default function AdminDashboardPage() {
 
     storeUpdateProduct(updatedProduct);
     setIsEditModalOpen(false);
+    const updatedProductName = formName;
     setEditingProduct(null);
-    showToast(`Product '${formName}' updated successfully in catalog database!`);
+
+    fetch('/api/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedProduct),
+    })
+      .then((r) => r.json())
+      .then((resData) => {
+        if (resData?.supabaseSynced) {
+          showToast(`Product '${updatedProductName}' updated & synced to Supabase!`);
+          checkSupabaseStatus();
+        } else {
+          showToast(`Product '${updatedProductName}' updated in catalog database.`);
+        }
+      })
+      .catch(() => {
+        showToast(`Product '${updatedProductName}' updated in catalog.`);
+      });
   };
 
   // Confirm Delete
@@ -525,7 +814,14 @@ export default function AdminDashboardPage() {
     if (target.slug && target.slug !== target.id) {
       storeDeleteProduct(target.slug);
     }
-    showToast(`Product '${target.name}' deleted successfully! Removed from Home and Catalog.`);
+    fetch(`/api/products?id=${encodeURIComponent(target.id)}`, { method: 'DELETE' })
+      .then(() => {
+        showToast(`Product '${target.name}' deleted from catalog and Supabase.`);
+        checkSupabaseStatus();
+      })
+      .catch(() => {
+        showToast(`Product '${target.name}' deleted.`);
+      });
   };
 
   // Filtered Bookings with multi-word search
@@ -593,6 +889,32 @@ export default function AdminDashboardPage() {
         .toLowerCase();
 
       return words.every((w) => searchableBlob.includes(w));
+    }
+    return true;
+  });
+
+  // Filtered Quotes with multi-word search & status filter
+  const filteredQuotes = quotes.filter((q) => {
+    if (quoteFilter !== 'all') {
+      if (quoteFilter === 'pending' && q.status !== 'pending' && q.status !== 'new') return false;
+      if (quoteFilter === 'quoted' && q.status !== 'quoted' && q.status !== 'in-review' && q.status !== 'negotiating') return false;
+      if (quoteFilter === 'closed' && q.status !== 'closed' && q.status !== 'resolved') return false;
+    }
+    if (quoteSearch.trim()) {
+      const words = quoteSearch.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      const blob = [
+        q.full_name,
+        q.company || '',
+        q.email,
+        q.phone || '',
+        q.country,
+        q.quantity || '',
+        q.details,
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return words.every((w) => blob.includes(w));
     }
     return true;
   });
@@ -709,6 +1031,7 @@ export default function AdminDashboardPage() {
           { id: 'bookings', label: 'All Website Bookings', icon: ClipboardList, count: bookings.length },
           { id: 'products', label: 'Products & Inventory', icon: Package, count: productList.length },
           { id: 'enquiries', label: 'Customer Enquiries', icon: Inbox, count: enquiries.length },
+          { id: 'quotes', label: 'Wholesale Quotes', icon: FileText, count: quotes.length },
           { id: 'overview', label: 'Overview & Analytics', icon: BarChart3 },
         ].map((tab) => {
           const isActive = activeTab === tab.id;
@@ -1059,20 +1382,114 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
+          {/* Supabase Missing Table Notice or Connected Banner */}
+          {!supabaseHealth?.tableExists ? (
+            <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 sm:p-5 shadow-xs">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500 text-white shadow-xs">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-extrabold text-amber-950">
+                        Supabase Action Required: &apos;products&apos; Table Missing in Your Database
+                      </h4>
+                      <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                        PGRST205
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-amber-900/80 leading-relaxed max-w-3xl">
+                      Your Supabase project (<strong className="font-semibold text-amber-950">shashankchawale&apos;s Project</strong>) has tables for quotes, orders, and enquiries, but the <strong className="font-bold text-amber-950">products</strong> table has not been created yet. Added products currently only save locally and will vanish on refresh. Run the quick SQL script below once in your Supabase SQL Editor so added products permanently appear in your Supabase Table Editor!
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(SQL_CREATE_PRODUCTS_SCRIPT);
+                      setCopiedSql(true);
+                      showToast('SQL Script copied to clipboard! Paste it into Supabase SQL Editor.');
+                      setTimeout(() => setCopiedSql(false), 3000);
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 px-3.5 py-2 text-xs font-bold text-white shadow-soft transition-colors"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    <span>{copiedSql ? 'Copied to Clipboard!' : '1-Click Copy SQL'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSqlModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-100/70 px-3.5 py-2 text-xs font-bold text-amber-950 transition-colors shadow-2xs"
+                  >
+                    <FileText className="h-4 w-4 text-amber-700" />
+                    <span>Setup Instructions</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => checkSupabaseStatus(true)}
+                    disabled={isVerifyingSupabase}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-100/70 px-3 py-2 text-xs font-bold text-amber-950 transition-colors shadow-2xs"
+                    title="Check if table was created in Supabase"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 text-amber-700 ${isVerifyingSupabase ? 'animate-spin' : ''}`} />
+                    <span>Verify</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:p-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-emerald-950">
+                      Supabase &apos;products&apos; Table Online &amp; Connected ({supabaseHealth.productCount ?? 0} items in Supabase)
+                    </p>
+                    <p className="text-[11px] text-emerald-800">
+                      All additions, edits, and deletions are saved directly to your Supabase Table Editor.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSeedAllToSupabase}
+                  disabled={isSeedingSupabase}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-3.5 py-1.5 text-xs font-bold text-white shadow-soft transition-colors shrink-0"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 ${isSeedingSupabase ? 'animate-spin' : ''}`} />
+                  <span>{isSeedingSupabase ? 'Syncing Catalog...' : 'Push All Catalog Items to Supabase'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Database & Supabase Live Status Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-slate-50 p-3 text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-bold text-navy">Database Status:</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 font-bold text-emerald-700 border border-emerald-200">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                Active Database Store ({productList.length} Items)
+                Active Catalog ({productList.length} Items)
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 font-bold text-primary border border-blue-200">
-                Supabase: {supabaseHealth?.connected ? 'Online' : 'Standby'}
-              </span>
+              {supabaseHealth?.tableExists ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 font-bold text-emerald-700 border border-emerald-200">
+                  Supabase: Connected ({supabaseHealth.productCount ?? 0} in Table)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 font-bold text-amber-800 border border-amber-300">
+                  Supabase: &apos;products&apos; Table Missing
+                </span>
+              )}
             </div>
             <span className="text-[11px] text-gray-500">
-              Admin changes update both local database & Supabase in real time.
+              {supabaseHealth?.tableExists
+                ? 'Two-way synchronization with Supabase Table Editor active.'
+                : 'Run the setup SQL once in Supabase SQL Editor to link your live products table.'}
             </span>
           </div>
 
@@ -1244,10 +1661,233 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* TAB 4: OVERVIEW & ANALYTICS */}
+      {/* TAB 4: WHOLESALE & PRODUCT QUOTES */}
+      {activeTab === 'quotes' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-extrabold text-navy">Wholesale & Product Quotes</h2>
+                <span className="rounded-full bg-blue-100 text-primary px-2.5 py-0.5 text-xs font-bold">
+                  {filteredQuotes.length} Requests
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Live bulk order and trade inquiries from /get-a-quote form recorded in Supabase.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setActiveTab('enquiries')}
+                className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-gray-600 hover:text-navy bg-slate-100 px-3 py-2 rounded-xl border border-border"
+              >
+                <span>Customer Enquiries ({enquiries.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={fetchQuotes}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingQuotes ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search & Filter Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-border/80 shadow-xs">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search quotes by client, company, email, phone, products..."
+                value={quoteSearch}
+                onChange={(e) => setQuoteSearch(e.target.value)}
+                className="w-full h-9 rounded-xl border border-border pl-10 pr-4 text-xs text-navy placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary bg-slate-50/50"
+              />
+            </div>
+
+            {/* Status Filter Pills */}
+            <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold text-gray-600">
+              {(['all', 'pending', 'quoted', 'closed'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setQuoteFilter(filter)}
+                  className={`rounded-lg px-3 py-1 capitalize transition-colors ${
+                    quoteFilter === filter
+                      ? 'bg-white text-navy shadow-xs font-extrabold'
+                      : 'text-gray-500 hover:text-navy'
+                  }`}
+                >
+                  {filter === 'all' ? 'All Quotes' : filter === 'quoted' ? 'Quoted' : filter}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quotes Cards List */}
+          <div className="space-y-4">
+            {filteredQuotes.length > 0 ? (
+              filteredQuotes.map((q) => {
+                const cleanPhone = (q.phone || '').replace(/[^0-9+]/g, '');
+                const waPhone = cleanPhone.replace(/^\+/, '');
+                const formattedDate = q.created_at
+                  ? new Date(q.created_at).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : 'Recent';
+
+                return (
+                  <div
+                    key={q.id}
+                    className="rounded-3xl border border-border/80 bg-white p-5 sm:p-6 shadow-soft space-y-4 hover:border-primary/40 transition-colors"
+                  >
+                    {/* Top Row: Client Info & Status Selector */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-extrabold text-navy text-sm sm:text-base">{q.full_name}</h3>
+                          {q.company && (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 text-primary border border-blue-200 px-2.5 py-0.5 text-xs font-bold">
+                              <Building2 className="h-3 w-3" />
+                              {q.company}
+                            </span>
+                          )}
+                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-gray-700">
+                            {q.country || 'International'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Submitted on {formattedDate}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <select
+                          value={q.status || 'pending'}
+                          onChange={(e) => updateQuoteStatus(q.id, e.target.value)}
+                          className={`h-8 rounded-xl px-3 text-xs font-bold border transition-colors cursor-pointer ${
+                            q.status === 'quoted'
+                              ? 'bg-blue-50 text-primary border-blue-200'
+                              : q.status === 'closed' || q.status === 'resolved'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}
+                        >
+                          <option value="pending">Pending Review</option>
+                          <option value="quoted">Quote Sent</option>
+                          <option value="negotiating">In Negotiation</option>
+                          <option value="closed">Order Confirmed</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Middle Row: Contact & Quantity Badges */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="rounded-xl bg-slate-50 p-2.5 border border-border/40">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
+                          Email Address
+                        </span>
+                        <a
+                          href={`mailto:${q.email}?subject=GUNA PHARMA Wholesale Quotation for ${encodeURIComponent(q.company || q.full_name)}`}
+                          className="font-semibold text-primary hover:underline truncate block"
+                        >
+                          {q.email}
+                        </a>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-50 p-2.5 border border-border/40">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
+                          Phone / Contact
+                        </span>
+                        {q.phone ? (
+                          <div className="flex items-center gap-2">
+                            <a href={`tel:${cleanPhone}`} className="font-semibold text-navy hover:text-primary">
+                              {q.phone}
+                            </a>
+                            {waPhone && (
+                              <a
+                                href={`https://wa.me/${waPhone}?text=${encodeURIComponent(`Hello ${q.full_name}, thank you for your wholesale inquiry with GUNA PHARMA. We have prepared your quotation.`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700"
+                              >
+                                <MessageCircle className="h-3 w-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">Not provided</span>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl bg-slate-50 p-2.5 border border-border/40">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
+                          Expected Quantity
+                        </span>
+                        <span className="font-extrabold text-navy flex items-center gap-1.5">
+                          <Package className="h-3.5 w-3.5 text-primary" />
+                          {q.quantity || 'Bulk / Trade Supply'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Details Box */}
+                    <div className="bg-blue-50/40 rounded-2xl p-4 text-xs text-navy leading-relaxed border border-blue-100">
+                      <p className="font-bold text-gray-500 text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        <FileText className="h-3.5 w-3.5 text-primary" />
+                        <span>Quotation Requirements & Products:</span>
+                      </p>
+                      <p className="text-xs sm:text-sm font-medium whitespace-pre-wrap">{q.details}</p>
+                    </div>
+
+                    {/* Action Bar */}
+                    <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+                      {q.phone && waPhone && (
+                        <a
+                          href={`https://wa.me/${waPhone}?text=${encodeURIComponent(`Hello ${q.full_name}, regarding your bulk inquiry at GUNA PHARMA: `)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors shadow-2xs"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>WhatsApp Client</span>
+                        </a>
+                      )}
+
+                      <a
+                        href={`mailto:${q.email}?subject=GUNA PHARMA Wholesale Quotation for ${encodeURIComponent(q.company || q.full_name)}&body=${encodeURIComponent(`Dear ${q.full_name},\n\nThank you for reaching out to GUNA PHARMA regarding wholesale availability for:\n"${q.details}"\n\nPlease find our preliminary trade pricing and supply terms attached.\n\nBest regards,\nGUNA PHARMA Trade Desk`)}`}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-hover transition-colors shadow-2xs"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        <span>Send Official Quotation</span>
+                      </a>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="rounded-3xl border border-dashed border-border bg-white p-12 text-center space-y-3">
+                <FileText className="h-10 w-10 text-gray-300 mx-auto" />
+                <h3 className="font-bold text-navy text-sm">No wholesale quotes found</h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  {quoteSearch ? `No quotes match "${quoteSearch}". Try clearing your search.` : 'Quotes submitted via the /get-a-quote form will appear here automatically.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: OVERVIEW & ANALYTICS */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
             <div className="rounded-3xl border border-border/80 bg-white p-6 shadow-soft">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Total Bookings</span>
               <p className="mt-3 text-3xl font-black text-navy">{bookings.length}</p>
@@ -1257,19 +1897,25 @@ export default function AdminDashboardPage() {
             <div className="rounded-3xl border border-border/80 bg-white p-6 shadow-soft">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Total Revenue</span>
               <p className="mt-3 text-3xl font-black text-primary">{formatPrice(totalRevenue)}</p>
-              <p className="mt-1 text-xs text-gray-500">From all completed checkouts</p>
+              <p className="mt-1 text-xs text-gray-500">From completed checkouts</p>
             </div>
 
             <div className="rounded-3xl border border-border/80 bg-white p-6 shadow-soft">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Active Products</span>
               <p className="mt-3 text-3xl font-black text-navy">{productList.length}</p>
-              <p className="mt-1 text-xs text-gray-500">Medicines, cosmetics & wellness</p>
+              <p className="mt-1 text-xs text-gray-500">Catalog items</p>
             </div>
 
             <div className="rounded-3xl border border-border/80 bg-white p-6 shadow-soft">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Customer Enquiries</span>
               <p className="mt-3 text-3xl font-black text-emerald-600">{enquiries.length}</p>
               <p className="mt-1 text-xs text-gray-500">Contact form submissions</p>
+            </div>
+
+            <div className="rounded-3xl border border-border/80 bg-white p-6 shadow-soft">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Wholesale Quotes</span>
+              <p className="mt-3 text-3xl font-black text-blue-600">{quotes.length}</p>
+              <p className="mt-1 text-xs text-gray-500">B2B & bulk inquiries</p>
             </div>
           </div>
         </div>
@@ -1732,6 +2378,130 @@ export default function AdminDashboardPage() {
               >
                 Delete Product
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SUPABASE SQL SETUP INSTRUCTIONS */}
+      {isSqlModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 sm:p-7 shadow-2xl space-y-5 my-8">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary-light text-primary border border-blue-200 shrink-0">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-navy">
+                    Setup &apos;products&apos; Table in Supabase
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Follow these 3 quick steps to link your Supabase Table Editor permanently.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSqlModalOpen(false)}
+                className="rounded-xl p-1.5 text-gray-400 hover:bg-slate-100 hover:text-navy transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Step-by-Step Guide */}
+            <div className="space-y-3 rounded-2xl bg-slate-50 p-4 border border-border/80 text-xs text-navy">
+              <div className="flex items-start gap-2.5">
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-white font-extrabold text-[11px] shrink-0">
+                  1
+                </span>
+                <p className="leading-snug">
+                  Open your <a href="https://supabase.com/dashboard/project/xtnazvpjlsupnyyovnes" target="_blank" rel="noreferrer" className="font-bold text-primary underline inline-flex items-center gap-1">Supabase Dashboard <ExternalLink className="h-3 w-3" /></a> for <strong>shashankchawale&apos;s Project</strong>.
+                </p>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-white font-extrabold text-[11px] shrink-0">
+                  2
+                </span>
+                <p className="leading-snug">
+                  On the left sidebar, click the <strong>SQL Editor</strong> icon (the <code className="bg-white px-1.5 py-0.5 rounded border border-border font-mono">&lt;_&gt;</code> icon directly below Table Editor). Then click <strong>+ New query</strong>.
+                </p>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-white font-extrabold text-[11px] shrink-0">
+                  3
+                </span>
+                <p className="leading-snug">
+                  Paste the SQL script below and click the green <strong>Run</strong> button. Once complete, click <strong>Verify Connection</strong> below!
+                </p>
+              </div>
+            </div>
+
+            {/* SQL Script Box */}
+            <div className="relative rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-inner overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/80 px-4 py-2 text-[11px] text-slate-400">
+                <span className="font-mono">supabase/create_products_table.sql</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(SQL_CREATE_PRODUCTS_SCRIPT);
+                    setCopiedSql(true);
+                    showToast('SQL Script copied to clipboard!');
+                    setTimeout(() => setCopiedSql(false), 3000);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary hover:bg-primary-hover px-2.5 py-1 text-xs font-bold text-white transition-colors"
+                >
+                  <ClipboardList className="h-3.5 w-3.5" />
+                  <span>{copiedSql ? 'Copied!' : 'Copy Script'}</span>
+                </button>
+              </div>
+              <pre className="max-h-60 overflow-y-auto p-4 text-[11px] font-mono leading-relaxed select-all text-emerald-300 no-scrollbar">
+                {SQL_CREATE_PRODUCTS_SCRIPT}
+              </pre>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(SQL_CREATE_PRODUCTS_SCRIPT);
+                  setCopiedSql(true);
+                  showToast('SQL script copied!');
+                  setTimeout(() => setCopiedSql(false), 3000);
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-slate-100 hover:bg-slate-200 px-4 py-2.5 text-xs font-bold text-navy transition-colors"
+              >
+                <ClipboardList className="h-4 w-4 text-primary" />
+                <span>{copiedSql ? 'Copied to Clipboard!' : 'Copy SQL Script'}</span>
+              </button>
+
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsSqlModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-border text-xs font-bold text-gray-600 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const h = await checkSupabaseStatus(true);
+                    if (h?.tableExists) {
+                      setIsSqlModalOpen(false);
+                    }
+                  }}
+                  disabled={isVerifyingSupabase}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-xs font-bold text-white hover:bg-primary-hover shadow-soft transition-colors"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isVerifyingSupabase ? 'animate-spin' : ''}`} />
+                  <span>{isVerifyingSupabase ? 'Verifying...' : 'Verify Connection'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

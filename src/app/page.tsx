@@ -34,29 +34,29 @@ export default async function HomePage() {
       {/* Background ambient lighting */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-300/20 via-transparent to-transparent pointer-events-none" />
 
-      <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-12 md:py-16 lg:py-20">
+      <div className="relative mx-auto grid max-w-7xl items-center gap-6 lg:gap-8 px-4 pt-3 pb-6 sm:px-6 sm:pt-4 sm:pb-8 md:grid-cols-12 md:pt-4 md:pb-8 lg:pt-5 lg:pb-8">
         {/* Left Column: Heading, Subheading & Buttons */}
-        <div className="space-y-6 md:col-span-7 lg:col-span-6 z-10">
+        <div className="space-y-3.5 sm:space-y-4 md:col-span-7 lg:col-span-6 z-10">
           <div className="inline-flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-[0.22em] text-blue-200">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.2em] text-blue-200">
               TRUSTED HEALTHCARE & COSMETICS
             </span>
           </div>
 
-          <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl leading-[1.08]">
+          <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl leading-[1.08]">
             Your Health.<br />
             Our Priority.
           </h1>
 
-          <p className="max-w-xl text-base sm:text-lg leading-relaxed text-blue-100">
+          <p className="max-w-xl text-sm sm:text-base leading-relaxed text-blue-100">
             Discover quality medicines, premium cosmetic products, and healthcare essentials from a trusted pharmaceutical exporter shipping worldwide.
           </p>
 
-          <div className="flex flex-wrap items-center gap-4 pt-2">
+          <div className="flex flex-wrap items-center gap-3.5 pt-1">
             <Link
               href="/medicines"
               prefetch={true}
-              className="inline-flex h-12 items-center justify-center rounded-full bg-white px-8 text-sm font-bold text-[#005AD2] shadow-lg transition-all duration-200 hover:bg-blue-50 hover:shadow-xl hover:scale-105"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-white px-7 text-sm font-bold text-[#005AD2] shadow-md transition-all duration-200 hover:bg-blue-50 hover:shadow-lg hover:scale-105"
             >
               Shop Medicines
             </Link>
@@ -64,13 +64,13 @@ export default async function HomePage() {
             <Link
               href="/catalog?category=skincare"
               prefetch={true}
-              className="inline-flex h-12 items-center justify-center rounded-full border-2 border-white/80 bg-transparent px-8 text-sm font-bold text-white transition-all duration-200 hover:bg-white/15 hover:border-white hover:scale-105"
+              className="inline-flex h-11 items-center justify-center rounded-full border-2 border-white/80 bg-transparent px-7 text-sm font-bold text-white transition-all duration-200 hover:bg-white/15 hover:border-white hover:scale-105"
             >
               Shop Cosmetics
             </Link>
           </div>
 
-          <div className="pt-2 flex flex-wrap items-center gap-6 text-xs text-blue-100 font-medium">
+          <div className="pt-1 flex flex-wrap items-center gap-5 text-xs text-blue-100 font-medium">
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 100% Genuine Medicines
             </span>

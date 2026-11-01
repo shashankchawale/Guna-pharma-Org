@@ -8,13 +8,7 @@ const nextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: [
-      'lucide-react',
-      '@supabase/supabase-js',
-      'zustand',
-      'clsx',
-      'tailwind-merge',
-    ],
+    optimizePackageImports: ['lucide-react'],
   },
 };
 

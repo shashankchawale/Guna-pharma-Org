@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev -p 3000 -H 0.0.0.0",
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev -p 3000 -H 0.0.0.0",
     "build": "NODE_ENV=production next build",
     "start": "next start -p 3000 -H 0.0.0.0",
     "lint": "eslint .",

@@ -25,20 +25,99 @@ export interface CatalogCategoryItem {
   name: string;
   sub: string;
   emoji: string;
-  gradient: string;
+  badge?: string;
+  bgGradient: string;
+  iconBg: string;
 }
 
 const CATALOG_CATEGORIES: CatalogCategoryItem[] = [
-  { id: '', name: 'All Store', sub: 'All items', emoji: '🛍️', gradient: 'from-blue-50 via-indigo-50/60 to-slate-50' },
-  { id: 'medicines', name: 'Medicines', sub: 'Rx & Generic', emoji: '💊', gradient: 'from-rose-50 via-pink-50/60 to-slate-50' },
-  { id: 'beauty', name: 'Beauty Care', sub: 'Cosmetics', emoji: '💄', gradient: 'from-pink-50 via-rose-50/60 to-slate-50' },
-  { id: 'pain-relief', name: 'Pain & Fever', sub: 'Balms & Relief', emoji: '🩹', gradient: 'from-amber-50 via-orange-50/60 to-slate-50' },
-  { id: 'cold-flu', name: 'Cold & Cough', sub: 'Inhalers & Care', emoji: '🌿', gradient: 'from-emerald-50 via-teal-50/60 to-slate-50' },
-  { id: 'wellness', name: 'Wellness', sub: 'Vitamins & Health', emoji: '🍊', gradient: 'from-orange-50 via-amber-50/60 to-slate-50' },
-  { id: 'hair-care', name: 'Hair Care', sub: 'Serums & Scalp', emoji: '💆', gradient: 'from-purple-50 via-indigo-50/60 to-slate-50' },
-  { id: 'skincare', name: 'Skincare', sub: 'Derma & Face', emoji: '✨', gradient: 'from-sky-50 via-cyan-50/60 to-slate-50' },
-  { id: 'digestive-health', name: 'Digestion', sub: 'Antacids & Gut', emoji: '🌱', gradient: 'from-lime-50 via-emerald-50/60 to-slate-50' },
-  { id: 'first-aid', name: 'First Aid', sub: 'Antiseptics', emoji: '➕', gradient: 'from-red-50 via-rose-50/60 to-slate-50' },
+  {
+    id: '',
+    name: 'All Products',
+    sub: 'Full Store',
+    emoji: '🛍️',
+    bgGradient: 'from-blue-50 to-indigo-50/60',
+    iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-blue-500/20',
+  },
+  {
+    id: 'medicines',
+    name: 'Medicines',
+    sub: 'Rx & Tablets',
+    emoji: '💊',
+    badge: 'Rx & OTC',
+    bgGradient: 'from-rose-50 to-pink-50/60',
+    iconBg: 'bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-rose-500/20',
+  },
+  {
+    id: 'beauty',
+    name: 'Beauty Care',
+    sub: 'Cosmetics',
+    emoji: '💄',
+    badge: 'Luxury',
+    bgGradient: 'from-pink-50 to-fuchsia-50/60',
+    iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-pink-500/20',
+  },
+  {
+    id: 'pain-relief',
+    name: 'Pain Relief',
+    sub: 'Balms & Sprays',
+    emoji: '🩹',
+    badge: 'Fast Relief',
+    bgGradient: 'from-amber-50 to-orange-50/60',
+    iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-amber-500/20',
+  },
+  {
+    id: 'fever',
+    name: 'Fever & Cold',
+    sub: 'Syrups & Tablets',
+    emoji: '🌡️',
+    badge: 'Clinical',
+    bgGradient: 'from-teal-50 to-emerald-50/60',
+    iconBg: 'bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-teal-500/20',
+  },
+  {
+    id: 'skincare',
+    name: 'Skincare',
+    sub: 'Derma & Creams',
+    emoji: '✨',
+    badge: 'Derma',
+    bgGradient: 'from-sky-50 to-blue-50/60',
+    iconBg: 'bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-sky-500/20',
+  },
+  {
+    id: 'wellness',
+    name: 'Wellness',
+    sub: 'Vitamins & Health',
+    emoji: '🍊',
+    badge: 'Nutrition',
+    bgGradient: 'from-orange-50 to-amber-50/60',
+    iconBg: 'bg-gradient-to-br from-orange-400 to-amber-600 text-white shadow-orange-500/20',
+  },
+  {
+    id: 'hair-care',
+    name: 'Hair Care',
+    sub: 'Serums & Scalp',
+    emoji: '💆',
+    badge: 'Salon Pro',
+    bgGradient: 'from-purple-50 to-violet-50/60',
+    iconBg: 'bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-purple-500/20',
+  },
+  {
+    id: 'digestive-health',
+    name: 'Digestion',
+    sub: 'Gut & Antacids',
+    emoji: '🌱',
+    bgGradient: 'from-emerald-50 to-green-50/60',
+    iconBg: 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-emerald-500/20',
+  },
+  {
+    id: 'first-aid',
+    name: 'First Aid',
+    sub: 'Antiseptics',
+    emoji: '➕',
+    bgGradient: 'from-red-50 to-rose-50/60',
+    iconBg: 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-red-500/20',
+  },
 ];
 
 function ProductSkeleton() {
@@ -152,14 +231,19 @@ function CatalogContent() {
             prodTags.some((t) => ['beauty', 'cosmetics', 'makeup'].includes(t));
         } else if (selectedCategory === 'pain-relief') {
           matchesCategory =
-            ['pain-relief', 'pain', 'fever'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('pain') || t.includes('balm') || t.includes('relief') || t.includes('fever')) ||
-            prodName.includes('balm') || prodName.includes('pain') || prodName.includes('tydol') || prodName.includes('paracetamol');
-        } else if (selectedCategory === 'cold-flu') {
+            ['pain-relief', 'pain'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('pain') || t.includes('balm') || t.includes('relief')) ||
+            prodName.includes('balm') || prodName.includes('pain') || prodName.includes('tydol');
+        } else if (selectedCategory === 'fever' || selectedCategory === 'cold-flu') {
           matchesCategory =
-            ['cold-flu', 'cold', 'cough'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('cold') || t.includes('cough') || t.includes('inhaler')) ||
-            prodName.includes('cold') || prodName.includes('cough') || prodName.includes('balm');
+            ['cold-flu', 'fever', 'cold'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('fever') || t.includes('cold') || t.includes('cough') || t.includes('inhaler') || t.includes('flu')) ||
+            prodName.includes('cold') || prodName.includes('cough') || prodName.includes('fever') || prodName.includes('paracetamol');
+        } else if (selectedCategory === 'skincare') {
+          matchesCategory =
+            ['skincare', 'body-care', 'skin'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('skin') || t.includes('serum') || t.includes('acne') || t.includes('moisturizer')) ||
+            prodName.includes('serum') || prodName.includes('wash') || prodName.includes('moisturizer') || prodName.includes('ceramide');
         } else if (selectedCategory === 'wellness') {
           matchesCategory =
             ['wellness', 'vitamins', 'supplements', 'ayurveda', 'herbal'].includes(prodCat) ||
@@ -170,11 +254,6 @@ function CatalogContent() {
             ['hair-care', 'hair'].includes(prodCat) ||
             prodTags.some((t) => t.includes('hair') || t.includes('scalp') || t.includes('shampoo') || t.includes('minoxidil')) ||
             prodName.includes('serum') || prodName.includes('shampoo') || prodName.includes('minoxidil') || prodName.includes('bontress');
-        } else if (selectedCategory === 'skincare') {
-          matchesCategory =
-            ['skincare', 'body-care', 'skin'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('skin') || t.includes('serum') || t.includes('acne') || t.includes('moisturizer')) ||
-            prodName.includes('serum') || prodName.includes('wash') || prodName.includes('moisturizer') || prodName.includes('ceramide');
         } else if (selectedCategory === 'digestive-health') {
           matchesCategory =
             ['digestive-health', 'digestion'].includes(prodCat) ||
@@ -212,7 +291,7 @@ function CatalogContent() {
           return searchableBlob.includes(term);
         });
 
-      return matchesCategory && matchesAvailability && matchesSearch;
+      return matchesCategory && matchesSearch;
     });
 
     // Sorting
@@ -231,27 +310,18 @@ function CatalogContent() {
     }
 
     return list;
-  }, [products, selectedCategory, rawSearch, availabilityFilter, sortOption]);
+  }, [products, selectedCategory, rawSearch, sortOption]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      {/* Top Banner & Header */}
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary">
-              DATABASE-BACKED CATALOG
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              {source === 'supabase' ? 'Supabase Live' : 'Dynamic Database'}
-            </span>
-          </div>
-          <h1 className="mt-1 text-2xl sm:text-3xl font-extrabold text-navy">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-navy">
             Medicines, Beauty & Healthcare Catalog
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-gray-500">
-            Real-time catalog supporting medicines, premium beauty products, clinical skincare, and wellness essentials.
+            Explore authentic medicines, premium beauty products, pain & fever care, clinical skincare, and wellness essentials.
           </p>
         </div>
 
@@ -309,81 +379,128 @@ function CatalogContent() {
         </div>
       )}
 
-      {/* Category Navigation Pills */}
-      <div className="mt-6 flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-        {CATALOG_CATEGORIES.map((cat) => {
-          const isActive = selectedCategory === cat.id || (!selectedCategory && !cat.id);
-          return (
-            <button
-              key={cat.id || 'all'}
-              type="button"
-              onClick={() => handleSelectCategory(cat.id)}
-              className={`whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                isActive
-                  ? 'border-primary bg-primary text-white shadow-soft'
-                  : 'border-border bg-white text-gray-700 hover:bg-primary-light hover:text-primary'
-              }`}
-            >
-              <span>{cat.icon}</span>
-              <span>{cat.name}</span>
-            </button>
-          );
-        })}
+      {/* Flipkart-Style Visual Category Carousel */}
+      <div className="relative mt-6 rounded-2xl border border-border/80 bg-white shadow-soft p-3 sm:p-4">
+        {/* Scroll Left Button */}
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => handleScroll('left')}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 grid h-9 w-9 place-items-center rounded-full bg-white shadow-lg border border-border text-navy hover:bg-slate-50 transition-all hover:scale-105 cursor-pointer"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="h-5 w-5 text-navy" />
+          </button>
+        )}
+
+        {/* Scroll Right Button */}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => handleScroll('right')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 grid h-9 w-9 place-items-center rounded-full bg-white shadow-lg border border-border text-navy hover:bg-slate-50 transition-all hover:scale-105 cursor-pointer"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="h-5 w-5 text-navy" />
+          </button>
+        )}
+
+        {/* Carousel Items Row */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={checkScroll}
+          className="flex items-center gap-2 sm:gap-3.5 overflow-x-auto no-scrollbar scroll-smooth px-1 py-1"
+        >
+          {CATALOG_CATEGORIES.map((cat) => {
+            const isActive = selectedCategory === cat.id || (!selectedCategory && !cat.id);
+            return (
+              <button
+                key={cat.id || 'all'}
+                type="button"
+                onClick={() => handleSelectCategory(cat.id)}
+                className={`group flex flex-col items-center shrink-0 w-[84px] sm:w-[96px] text-center transition-all cursor-pointer rounded-2xl p-2 ${
+                  isActive
+                    ? 'bg-blue-50/70 ring-2 ring-primary shadow-xs'
+                    : 'hover:bg-slate-50/80'
+                }`}
+              >
+                {/* Squircle Icon Box */}
+                <div className="relative mb-2 flex items-center justify-center">
+                  <div
+                    className={`relative flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-gradient-to-b ${cat.bgGradient} p-1 shadow-sm transition-all duration-200 group-hover:scale-105 ${
+                      isActive ? 'border-2 border-primary shadow-md' : 'border border-border/60'
+                    }`}
+                  >
+                    <span className="text-2xl sm:text-3xl select-none filter drop-shadow-xs">
+                      {cat.emoji}
+                    </span>
+                  </div>
+
+                  {cat.badge && (
+                    <span className="absolute -top-1 -right-1 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-2xs leading-none">
+                      {cat.badge}
+                    </span>
+                  )}
+                </div>
+
+                {/* Title & Subtitle */}
+                <span
+                  className={`text-xs font-bold truncate max-w-[80px] sm:max-w-[90px] leading-tight transition-colors ${
+                    isActive ? 'text-primary' : 'text-navy group-hover:text-primary'
+                  }`}
+                >
+                  {cat.name}
+                </span>
+                <span className="text-[10px] text-gray-400 font-medium truncate max-w-[80px] sm:max-w-[90px] mt-0.5">
+                  {cat.sub}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Filter Bar: Availability, Stats & Sorting */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-border/60 py-3 bg-slate-50/70 rounded-2xl px-4">
-        {/* Availability Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <span className="text-xs text-gray-500 font-bold mr-1 hidden sm:inline">Filter:</span>
-          {[
-            { id: 'all', label: 'All Items' },
-            { id: 'in-stock', label: 'In Stock' },
-            { id: 'otc', label: 'OTC Non-Rx' },
-            { id: 'rx', label: 'Prescription (Rx)' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setAvailabilityFilter(item.id as any)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                availabilityFilter === item.id
-                  ? 'bg-navy text-white shadow-2xs'
-                  : 'bg-white text-gray-600 border border-border/80 hover:bg-gray-100'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+      {/* Filter Bar: Item count & Sorting */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-y border-border/60 py-3 bg-slate-50/70 rounded-2xl px-4">
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-gray-500 font-medium">
+            Showing <span className="font-bold text-navy">{filtered.length}</span> items
+          </p>
+          {selectedCategory && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">
+              {CATALOG_CATEGORIES.find((c) => c.id === selectedCategory)?.name || selectedCategory}
+              <button
+                type="button"
+                onClick={() => handleSelectCategory('')}
+                className="hover:text-rose-600 transition-colors ml-0.5"
+                title="Clear category"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
         </div>
 
-        {/* Counter & Sorter */}
-        <div className="flex items-center gap-3">
-          <p className="text-xs text-gray-500 font-medium hidden sm:inline">
-            <span className="font-bold text-navy">{filtered.length}</span> items
-          </p>
-
-          <div className="flex items-center gap-1.5">
-            <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
-            <select
-              value={sortOption}
-              onChange={(e) => setSortOption(e.target.value)}
-              className="h-8 rounded-lg border border-border bg-white px-2.5 text-xs text-navy font-semibold focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
-              aria-label="Sort catalog"
-            >
-              <option value="relevant">Most relevant</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-              <option value="discount">Highest Discount</option>
-              <option value="rating">Top Rated</option>
-              <option value="newest">Newest Arrivals</option>
-            </select>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+          <select
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value)}
+            className="h-8 rounded-lg border border-border bg-white px-2.5 text-xs text-navy font-semibold focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+            aria-label="Sort catalog"
+          >
+            <option value="relevant">Most relevant</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="discount">Highest Discount</option>
+            <option value="rating">Top Rated</option>
+            <option value="newest">Newest Arrivals</option>
+          </select>
         </div>
       </div>
 
       {/* Active Filter Tags */}
-      {(rawSearch || selectedCategory || availabilityFilter !== 'all') && (
+      {(rawSearch || selectedCategory) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {rawSearch && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-bold text-primary">
@@ -413,33 +530,11 @@ function CatalogContent() {
             </span>
           )}
 
-          {availabilityFilter !== 'all' && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-border px-3 py-1 text-xs font-bold text-navy">
-              <span>
-                Filter:{' '}
-                {availabilityFilter === 'in-stock'
-                  ? 'In Stock Only'
-                  : availabilityFilter === 'rx'
-                  ? 'Prescription Only'
-                  : 'OTC Non-Rx'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setAvailabilityFilter('all')}
-                className="hover:text-rose-600 transition-colors"
-                title="Reset availability filter"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </span>
-          )}
-
           <button
             type="button"
             onClick={() => {
               handleClearSearch();
               handleSelectCategory('');
-              setAvailabilityFilter('all');
             }}
             className="text-xs font-bold text-gray-500 hover:text-navy underline ml-1 cursor-pointer"
           >
@@ -469,8 +564,8 @@ function CatalogContent() {
           <h2 className="font-bold text-navy text-base sm:text-lg">No products found</h2>
           <p className="mt-1 text-xs sm:text-sm text-gray-500 max-w-md mx-auto">
             {rawSearch
-              ? `We couldn't find any items matching "${rawSearch}" under the chosen criteria.`
-              : 'No items are currently active in this category or availability filter.'}
+              ? `We couldn't find any items matching "${rawSearch}".`
+              : 'No items currently in this category.'}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <button
@@ -478,7 +573,6 @@ function CatalogContent() {
               onClick={() => {
                 handleClearSearch();
                 handleSelectCategory('');
-                setAvailabilityFilter('all');
               }}
               className="inline-flex rounded-xl bg-primary px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-soft hover:bg-primary-hover transition-colors cursor-pointer"
             >

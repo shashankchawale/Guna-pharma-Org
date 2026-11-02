@@ -209,7 +209,7 @@ export function Footer() {
       {/* Contact & Compliance */}
       <div className="border-t border-white/10 bg-black/20 py-8">
         <div className="mx-auto max-w-7xl px-3 md:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {/* Contact Info */}
             <div className="space-y-3">
               <h3 className="font-bold text-white text-base">Contact Us</h3>
@@ -241,29 +241,6 @@ export function Footer() {
                   </a>
                 </div>
               </address>
-            </div>
-
-            {/* Compliance Info */}
-            <div className="space-y-3">
-              <h3 className="font-bold text-white text-base">Licenses & Certifications</h3>
-              <dl className="space-y-2 text-sm text-blue-200/85">
-                <div className="flex items-start gap-2">
-                  <dt className="font-medium text-blue-100 w-32 flex-shrink-0">Drug License:</dt>
-                  <dd className="text-blue-200/75">{brandConfig.compliance.drugLicenseNumber}</dd>
-                </div>
-                <div className="flex items-start gap-2">
-                  <dt className="font-medium text-blue-100 w-32 flex-shrink-0">GST Number:</dt>
-                  <dd className="text-blue-200/75">{brandConfig.compliance.gstNumber}</dd>
-                </div>
-                <div className="flex items-start gap-2">
-                  <dt className="font-medium text-blue-100 w-32 flex-shrink-0">Pharmacist:</dt>
-                  <dd className="text-blue-200/75">{brandConfig.compliance.pharmacistName}</dd>
-                </div>
-                <div className="flex items-start gap-2">
-                  <dt className="font-medium text-blue-100 w-32 flex-shrink-0">Reg. Number:</dt>
-                  <dd className="text-blue-200/75">{brandConfig.compliance.pharmacistRegistration}</dd>
-                </div>
-              </dl>
             </div>
 
             {/* Medical Disclaimer */}

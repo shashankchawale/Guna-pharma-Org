@@ -5,11 +5,9 @@ import Link from 'next/link';
 import {
   ClipboardList,
   Clock,
-  ExternalLink,
   MapPin,
   Package,
   Plus,
-  RotateCcw,
   Search,
   ShieldCheck,
   ShoppingBag,
@@ -22,9 +20,7 @@ import {
 } from 'lucide-react';
 import { useOrdersStore, type DetailedOrder } from '@/store/orders';
 import { useFormatPrice } from '@/store/locale';
-import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
-import { products } from '@/lib/catalog';
 
 type Tab = 'orders' | 'addresses' | 'prescriptions' | 'profile';
 
@@ -35,7 +31,6 @@ export default function AccountPage() {
 
   const { orders, syncWithSupabase } = useOrdersStore();
   const formatPrice = useFormatPrice();
-  const { addItem, openCart } = useCartStore();
   const { user, signOut, initAuth } = useAuthStore();
 
   React.useEffect(() => {
@@ -58,15 +53,6 @@ export default function AccountPage() {
     }
     return true;
   });
-
-  const handleReorder = (order: DetailedOrder) => {
-    // Add items from this order to cart
-    (order.items || []).forEach((item) => {
-      const catalogProduct = products.find((p) => p.name.toLowerCase() === item.product_name.toLowerCase()) || products[0];
-      addItem(catalogProduct);
-    });
-    openCart();
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -276,46 +262,6 @@ export default function AccountPage() {
                       </div>
                     </div>
 
-                    {/* Visual Progress Steps Preview */}
-                    <div className="py-4 border-b border-border">
-                      <div className="flex items-center justify-between text-xs font-semibold text-gray-500 mb-2">
-                        <span className="flex items-center gap-1.5 text-primary">
-                          <Truck className="h-3.5 w-3.5" />
-                          {order.carrier || 'BlueDart Express'} · {order.tracking_number}
-                        </span>
-                        <span>
-                          {order.status === 'delivered'
-                            ? 'Delivered'
-                            : `Est. Delivery: ${order.estimated_delivery || '3-4 Days'}`}
-                        </span>
-                      </div>
-
-                      {/* Step Progress Bar */}
-                      <div className="grid grid-cols-4 gap-2 pt-1">
-                        {[
-                          { title: 'Confirmed', isDone: true },
-                          { title: 'Pharmacist Review', isDone: order.status !== 'pending' },
-                          { title: 'In Transit', isDone: order.status === 'shipped' || order.status === 'delivered' },
-                          { title: 'Delivered', isDone: order.status === 'delivered' },
-                        ].map((s, idx) => (
-                          <div key={idx} className="flex flex-col gap-1">
-                            <div
-                              className={`h-2 rounded-full transition-all duration-500 ${
-                                s.isDone ? 'bg-primary' : 'bg-gray-100'
-                              }`}
-                            />
-                            <span
-                              className={`text-[10px] truncate ${
-                                s.isDone ? 'font-bold text-navy' : 'text-gray-400'
-                              }`}
-                            >
-                              {s.title}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
                     {/* Order Items Preview */}
                     <div className="py-4 divide-y divide-border/60">
                       {(order.items || []).map((item) => (
@@ -340,28 +286,10 @@ export default function AccountPage() {
                       ))}
                     </div>
 
-                    {/* Order Action Buttons */}
-                    <div className="pt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border">
-                      <div className="text-xs text-gray-500">
+                    {/* Order Footer */}
+                    <div className="pt-3.5 flex flex-wrap items-center justify-between gap-2 border-t border-border text-xs text-gray-500">
+                      <div>
                         Shipping to: <span className="font-semibold text-navy">{order.shipping_address?.full_name}</span> ({order.shipping_address?.city})
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleReorder(order)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-navy transition-colors"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Reorder
-                        </button>
-                        <Link
-                          href={`/track-order?id=${order.order_number}`}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-hover shadow-soft transition-colors"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          Live Tracking Details
-                        </Link>
                       </div>
                     </div>
                   </article>

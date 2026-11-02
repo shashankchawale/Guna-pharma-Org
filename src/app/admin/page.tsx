@@ -283,8 +283,8 @@ export default function AdminDashboardPage() {
   const [formName, setFormName] = React.useState('');
   const [formCategoryId, setFormCategoryId] = React.useState('medicines');
   const [formBrand, setFormBrand] = React.useState('GUNA PHARMA');
-  const [formMrp, setFormMrp] = React.useState('299');
-  const [formSellingPrice, setFormSellingPrice] = React.useState('249');
+  const [formMrp, setFormMrp] = React.useState('29.99');
+  const [formSellingPrice, setFormSellingPrice] = React.useState('24.99');
   const [formStock, setFormStock] = React.useState('50');
   const [formIsAvailable, setFormIsAvailable] = React.useState(true);
   const [formRequiresRx, setFormRequiresRx] = React.useState(false);
@@ -716,8 +716,8 @@ export default function AdminDashboardPage() {
   // Handle Add Product
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    const mrpNum = Number(formMrp) || 299;
-    const priceNum = Number(formSellingPrice) || 249;
+    const mrpNum = Number(formMrp) || 29.99;
+    const priceNum = Number(formSellingPrice) || 24.99;
     const slug = formName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const finalImage = formImageUrl.trim() || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80';
     const calculatedDiscount = mrpNum > 0 && priceNum < mrpNum ? Math.round(((mrpNum - priceNum) / mrpNum) * 100) : 0;
@@ -2101,9 +2101,10 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">MRP (₹) *</label>
+                  <label className="block font-bold text-gray-700 mb-1">MRP ($) *</label>
                   <input
                     type="number"
+                    step="0.01"
                     required
                     value={formMrp}
                     onChange={(e) => setFormMrp(e.target.value)}
@@ -2112,9 +2113,10 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Selling Price (₹) *</label>
+                  <label className="block font-bold text-gray-700 mb-1">Selling Price ($) *</label>
                   <input
                     type="number"
+                    step="0.01"
                     required
                     value={formSellingPrice}
                     onChange={(e) => setFormSellingPrice(e.target.value)}
@@ -2318,9 +2320,10 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">MRP (₹) *</label>
+                  <label className="block font-bold text-gray-700 mb-1">MRP ($) *</label>
                   <input
                     type="number"
+                    step="0.01"
                     required
                     value={formMrp}
                     onChange={(e) => setFormMrp(e.target.value)}
@@ -2329,9 +2332,10 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Selling Price (₹) *</label>
+                  <label className="block font-bold text-gray-700 mb-1">Selling Price ($) *</label>
                   <input
                     type="number"
+                    step="0.01"
                     required
                     value={formSellingPrice}
                     onChange={(e) => setFormSellingPrice(e.target.value)}

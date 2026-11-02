@@ -138,7 +138,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-border transition-all">
       {/* Top Banner / Announcement */}
-      <div className="bg-primary text-white text-[11px] sm:text-xs py-1.5 px-4 text-center font-semibold tracking-wide">
+      <div className="bg-primary text-white text-[11px] sm:text-xs py-1.5 px-4 text-center font-semibold tracking-wide flex items-center justify-center gap-2 flex-wrap">
         <span>Trusted Pharmaceutical Exporter Shipping Worldwide &bull; 100% Genuine Healthcare Products</span>
       </div>
 
@@ -413,7 +413,7 @@ export function Header() {
             })}
           </ul>
 
-          <div className="flex items-center gap-4 text-xs font-semibold text-gray-500">
+          <div className="flex items-center gap-3 text-xs font-semibold text-gray-500">
             <span className="flex items-center gap-1 text-emerald-600">
               <ShieldCheck className="h-4 w-4" />
               Licensed Pharmacy

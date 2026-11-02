@@ -14,18 +14,31 @@ import {
   Package,
   Layers,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useProductsStore } from '@/store/products';
 import { ProductCard } from '@/components/product/product-card';
 
-const CATALOG_CATEGORIES = [
-  { id: '', name: 'All Products', icon: '🛍️' },
-  { id: 'medicines', name: 'Medicines', icon: '💊' },
-  { id: 'beauty', name: 'Beauty Products', icon: '💄' },
-  { id: 'skincare', name: 'Skincare', icon: '✨' },
-  { id: 'wellness', name: 'Wellness Products', icon: '🌿' },
-  { id: 'pain-relief', name: 'Pain Relief', icon: '🩹' },
-  { id: 'hair-care', name: 'Hair Care', icon: '💆' },
+export interface CatalogCategoryItem {
+  id: string;
+  name: string;
+  sub: string;
+  emoji: string;
+  gradient: string;
+}
+
+const CATALOG_CATEGORIES: CatalogCategoryItem[] = [
+  { id: '', name: 'All Store', sub: 'All items', emoji: '🛍️', gradient: 'from-blue-50 via-indigo-50/60 to-slate-50' },
+  { id: 'medicines', name: 'Medicines', sub: 'Rx & Generic', emoji: '💊', gradient: 'from-rose-50 via-pink-50/60 to-slate-50' },
+  { id: 'beauty', name: 'Beauty Care', sub: 'Cosmetics', emoji: '💄', gradient: 'from-pink-50 via-rose-50/60 to-slate-50' },
+  { id: 'pain-relief', name: 'Pain & Fever', sub: 'Balms & Relief', emoji: '🩹', gradient: 'from-amber-50 via-orange-50/60 to-slate-50' },
+  { id: 'cold-flu', name: 'Cold & Cough', sub: 'Inhalers & Care', emoji: '🌿', gradient: 'from-emerald-50 via-teal-50/60 to-slate-50' },
+  { id: 'wellness', name: 'Wellness', sub: 'Vitamins & Health', emoji: '🍊', gradient: 'from-orange-50 via-amber-50/60 to-slate-50' },
+  { id: 'hair-care', name: 'Hair Care', sub: 'Serums & Scalp', emoji: '💆', gradient: 'from-purple-50 via-indigo-50/60 to-slate-50' },
+  { id: 'skincare', name: 'Skincare', sub: 'Derma & Face', emoji: '✨', gradient: 'from-sky-50 via-cyan-50/60 to-slate-50' },
+  { id: 'digestive-health', name: 'Digestion', sub: 'Antacids & Gut', emoji: '🌱', gradient: 'from-lime-50 via-emerald-50/60 to-slate-50' },
+  { id: 'first-aid', name: 'First Aid', sub: 'Antiseptics', emoji: '➕', gradient: 'from-red-50 via-rose-50/60 to-slate-50' },
 ];
 
 function ProductSkeleton() {
@@ -51,11 +64,36 @@ function CatalogContent() {
   const rawSearch = searchParams.get('search') ?? '';
   const selectedCategory = searchParams.get('category') ?? '';
   const [sortOption, setSortOption] = React.useState('relevant');
-  const [availabilityFilter, setAvailabilityFilter] = React.useState<'all' | 'in-stock' | 'rx' | 'otc'>('all');
   const [userQuery, setUserQuery] = React.useState<string | null>(null);
   const searchInput = userQuery !== null ? userQuery : rawSearch;
 
-  const { products, isLoading, error, source, isHydrated, syncWithServer, clearError } =
+  // Carousel scroll ref & state (Flipkart-style navigation)
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = React.useState(false);
+  const [canScrollRight, setCanScrollRight] = React.useState(true);
+
+  const checkScroll = React.useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [checkScroll]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const amount = direction === 'left' ? -280 : 280;
+      scrollContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
+
+  const { products, isLoading, error, isHydrated, syncWithServer, clearError } =
     useProductsStore();
 
   React.useEffect(() => {
@@ -100,28 +138,56 @@ function CatalogContent() {
       let matchesCategory = true;
       if (selectedCategory) {
         const prodCat = (product.category_id || (typeof product.category === 'string' ? product.category : '')).toLowerCase();
-        if (selectedCategory === 'medicines') {
-          matchesCategory = ['medicines', 'pain-relief', 'cold-flu', 'digestive-health', 'first-aid'].includes(prodCat);
-        } else if (selectedCategory === 'beauty') {
-          matchesCategory = ['beauty', 'cosmetics', 'hair-care', 'makeup'].includes(prodCat);
-        } else if (selectedCategory === 'skincare') {
-          matchesCategory = ['skincare', 'body-care', 'skin'].includes(prodCat);
-        } else if (selectedCategory === 'wellness') {
-          matchesCategory = ['wellness', 'vitamins', 'supplements', 'ayurveda', 'herbal'].includes(prodCat);
-        } else {
-          matchesCategory = prodCat === selectedCategory;
-        }
-      }
+        const prodName = (product.name || '').toLowerCase();
+        const prodTags = (product.tags || []).map((t) => (t || '').toLowerCase());
 
-      // Availability filter
-      let matchesAvailability = true;
-      const inStock = product.is_available ?? (product.stock_quantity > 0);
-      if (availabilityFilter === 'in-stock') {
-        matchesAvailability = inStock;
-      } else if (availabilityFilter === 'rx') {
-        matchesAvailability = Boolean(product.requires_prescription);
-      } else if (availabilityFilter === 'otc') {
-        matchesAvailability = !product.requires_prescription;
+        if (selectedCategory === 'medicines') {
+          matchesCategory =
+            ['medicines', 'pharma', 'pain-relief', 'cold-flu', 'first-aid', 'digestive-health'].includes(prodCat) ||
+            Boolean(product.requires_prescription) ||
+            prodTags.includes('medicines');
+        } else if (selectedCategory === 'beauty') {
+          matchesCategory =
+            ['beauty', 'cosmetics', 'hair-care', 'skincare', 'makeup'].includes(prodCat) ||
+            prodTags.some((t) => ['beauty', 'cosmetics', 'makeup'].includes(t));
+        } else if (selectedCategory === 'pain-relief') {
+          matchesCategory =
+            ['pain-relief', 'pain', 'fever'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('pain') || t.includes('balm') || t.includes('relief') || t.includes('fever')) ||
+            prodName.includes('balm') || prodName.includes('pain') || prodName.includes('tydol') || prodName.includes('paracetamol');
+        } else if (selectedCategory === 'cold-flu') {
+          matchesCategory =
+            ['cold-flu', 'cold', 'cough'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('cold') || t.includes('cough') || t.includes('inhaler')) ||
+            prodName.includes('cold') || prodName.includes('cough') || prodName.includes('balm');
+        } else if (selectedCategory === 'wellness') {
+          matchesCategory =
+            ['wellness', 'vitamins', 'supplements', 'ayurveda', 'herbal'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('wellness') || t.includes('vitamin') || t.includes('omega') || t.includes('gumm') || t.includes('antioxidant')) ||
+            prodName.includes('omega') || prodName.includes('glutathione') || prodName.includes('gummy') || prodName.includes('multivitamin');
+        } else if (selectedCategory === 'hair-care') {
+          matchesCategory =
+            ['hair-care', 'hair'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('hair') || t.includes('scalp') || t.includes('shampoo') || t.includes('minoxidil')) ||
+            prodName.includes('serum') || prodName.includes('shampoo') || prodName.includes('minoxidil') || prodName.includes('bontress');
+        } else if (selectedCategory === 'skincare') {
+          matchesCategory =
+            ['skincare', 'body-care', 'skin'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('skin') || t.includes('serum') || t.includes('acne') || t.includes('moisturizer')) ||
+            prodName.includes('serum') || prodName.includes('wash') || prodName.includes('moisturizer') || prodName.includes('ceramide');
+        } else if (selectedCategory === 'digestive-health') {
+          matchesCategory =
+            ['digestive-health', 'digestion'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('digest') || t.includes('antacid') || t.includes('gut')) ||
+            prodName.includes('digest');
+        } else if (selectedCategory === 'first-aid') {
+          matchesCategory =
+            ['first-aid', 'wound-care'].includes(prodCat) ||
+            prodTags.some((t) => t.includes('first-aid') || t.includes('antiseptic') || t.includes('bandage')) ||
+            prodName.includes('betadine') || prodName.includes('bandage');
+        } else {
+          matchesCategory = prodCat === selectedCategory || prodTags.includes(selectedCategory);
+        }
       }
 
       // Multi-word smart search matching

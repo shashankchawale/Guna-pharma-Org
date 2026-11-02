@@ -264,14 +264,21 @@ export async function getLiveCatalogProducts(cookieDeletedIds: string[] = []): P
       supabaseProducts = await fetchSupabaseProducts();
     }
 
+    const localProducts = getServerProducts([]);
     if (supabaseProducts && supabaseProducts.length > 0) {
+      const productMap = new Map<string, Product>();
+      for (const p of localProducts) {
+        if (p && p.id) productMap.set(p.id, p);
+      }
+      for (const p of supabaseProducts) {
+        if (p && p.id) productMap.set(p.id, normalizeProduct(p));
+      }
       baseResult = {
-        products: supabaseProducts.map(normalizeProduct),
+        products: Array.from(productMap.values()),
         source: 'supabase',
         supabaseHealth: health,
       };
     } else {
-      const localProducts = getServerProducts([]);
       baseResult = {
         products: localProducts,
         source: 'database',

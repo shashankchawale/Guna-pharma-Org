@@ -31,38 +31,41 @@ export function FeaturedProducts({ initialProducts = [] }: FeaturedProductsProps
   }, [syncWithServer]);
 
   // Determine active products list:
-  // On SSR and initial client hydration pass, strictly render initialProducts.slice(0, 8)
-  // so server HTML and client initial DOM match 100%
+  // Render up to 12 featured products, prioritizing user-added products
   const displayProducts = React.useMemo(() => {
-    if (!mounted) {
-      return initialProducts.slice(0, 8);
-    }
-
     const deletedSet = new Set(
       (deletedProductIds || []).map((d) => (d || '').trim().toLowerCase()).filter(Boolean)
     );
 
-    try {
-      const storedDeleted = localStorage.getItem('guna_deleted_product_ids');
-      if (storedDeleted) {
-        const parsed = JSON.parse(storedDeleted);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((d) => {
-            if (d) deletedSet.add(String(d).trim().toLowerCase());
-          });
+    if (mounted) {
+      try {
+        const storedDeleted = localStorage.getItem('guna_deleted_product_ids');
+        if (storedDeleted) {
+          const parsed = JSON.parse(storedDeleted);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((d) => {
+              if (d) deletedSet.add(String(d).trim().toLowerCase());
+            });
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
-    const source = isHydrated && products.length > 0 ? products : initialProducts;
+    const source = mounted && isHydrated && products.length > 0 ? products : initialProducts;
 
-    return source
-      .filter((p) => {
-        const idLower = (p.id || '').trim().toLowerCase();
-        const slugLower = (p.slug || '').trim().toLowerCase();
-        return !deletedSet.has(idLower) && !deletedSet.has(slugLower);
-      })
-      .slice(0, 8);
+    const filtered = source.filter((p) => {
+      const idLower = (p.id || '').trim().toLowerCase();
+      const slugLower = (p.slug || '').trim().toLowerCase();
+      return !deletedSet.has(idLower) && !deletedSet.has(slugLower);
+    });
+
+    // Prioritize user-added products (like Tydol 100 Tablet) and products marked is_featured
+    const userAdded = filtered.filter((p) => p.id?.startsWith('prod-'));
+    const featuredItems = filtered.filter((p) => !p.id?.startsWith('prod-') && p.is_featured);
+    const standardItems = filtered.filter((p) => !p.id?.startsWith('prod-') && !p.is_featured);
+
+    const ordered = [...userAdded, ...featuredItems, ...standardItems];
+    return ordered.slice(0, 12);
   }, [mounted, isHydrated, products, initialProducts, deletedProductIds]);
 
   if (displayProducts.length === 0 && mounted) {
@@ -95,7 +98,7 @@ export function FeaturedProducts({ initialProducts = [] }: FeaturedProductsProps
           View all
         </Link>
       </div>
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-6">
         {displayProducts.map((product) => (
           <ProductCard key={product.id || product.slug} product={product} />
         ))}

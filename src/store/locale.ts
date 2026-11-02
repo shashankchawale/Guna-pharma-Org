@@ -9,18 +9,17 @@ export interface CurrencyConfig {
   code: string;
   symbol: string;
   name: string;
-  rate: number; // multiplier from base INR
+  rate: number; // multiplier from base USD (USD = 1)
   locale: string;
 }
 
 export const supportedCurrencies: CurrencyConfig[] = [
-  { code: 'INR', symbol: '₹', name: 'Indian Rupee', rate: 1, locale: 'en-IN' },
-  { code: 'USD', symbol: '$', name: 'US Dollar', rate: 0.012, locale: 'en-US' },
-  { code: 'EUR', symbol: '€', name: 'Euro', rate: 0.011, locale: 'de-DE' },
-  { code: 'GBP', symbol: '£', name: 'British Pound', rate: 0.0093, locale: 'en-GB' },
-  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', rate: 0.018, locale: 'en-AU' },
-  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', rate: 0.016, locale: 'en-CA' },
-  { code: 'AED', symbol: 'AED', name: 'UAE Dirham', rate: 0.044, locale: 'ar-AE' },
+  { code: 'USD', symbol: '$', name: 'US Dollar', rate: 1, locale: 'en-US' },
+  { code: 'EUR', symbol: '€', name: 'Euro', rate: 0.92, locale: 'de-DE' },
+  { code: 'GBP', symbol: '£', name: 'British Pound', rate: 0.79, locale: 'en-GB' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', rate: 1.52, locale: 'en-AU' },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', rate: 1.36, locale: 'en-CA' },
+  { code: 'AED', symbol: 'AED', name: 'UAE Dirham', rate: 3.67, locale: 'ar-AE' },
 ];
 
 export interface LanguageConfig {
@@ -230,11 +229,38 @@ export const useLocaleStore = create<LocaleState>()(
           document.documentElement.dir = language.dir;
         }
       },
-      setCurrency: (currency) => set({ currency }),
+      setCurrency: (currency) => {
+        if (!currency || currency.code === 'INR' || !supportedCurrencies.some((c) => c.code === currency.code)) {
+          set({ currency: supportedCurrencies[0] });
+          return;
+        }
+        set({ currency });
+      },
     }),
     {
-      name: 'gunapharma-locale',
-      storage: createJSONStorage(() => (typeof window !== 'undefined' ? localStorage : dummyStorage)),
+      name: 'gunapharma-locale-v2',
+      storage: createJSONStorage(() => {
+        if (typeof window !== 'undefined') {
+          try {
+            // Clean up legacy v1 storage that might have had INR cached
+            window.localStorage.removeItem('gunapharma-locale');
+          } catch {
+            // ignore
+          }
+          return localStorage;
+        }
+        return dummyStorage;
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (
+          state &&
+          (!state.currency ||
+            state.currency.code === 'INR' ||
+            !supportedCurrencies.some((c) => c.code === state.currency.code))
+        ) {
+          state.currency = supportedCurrencies[0];
+        }
+      },
     }
   )
 );
@@ -245,13 +271,14 @@ const dummyStorage = {
   removeItem: () => {},
 };
 
-export function formatPriceValue(inrAmount: number, currency: CurrencyConfig): string {
-  const rate = currency?.rate || 1;
-  const converted = inrAmount * rate;
-  if (!currency || currency.code === 'INR') {
-    return `₹${Math.round(converted).toLocaleString('en-IN')}`;
-  }
-  return `${currency.symbol}${converted.toLocaleString('en-US', {
+export function formatPriceValue(amount: number, currency?: CurrencyConfig): string {
+  const active =
+    currency && currency.code !== 'INR' && supportedCurrencies.some((c) => c.code === currency.code)
+      ? currency
+      : supportedCurrencies[0];
+  const rate = active?.rate || 1;
+  const converted = amount * rate;
+  return `${active.symbol}${converted.toLocaleString(active.locale || 'en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -262,11 +289,14 @@ export function useFormatPrice() {
   const mounted = useIsMounted();
 
   return React.useCallback(
-    (inrAmount: number) => {
-      // During SSR and initial client hydration pass, use default base currency (INR)
+    (amount: number) => {
+      // During SSR and initial client hydration pass, use default base currency (USD)
       // so server HTML and client initial DOM match 100%
-      const activeCurrency = mounted ? currency : supportedCurrencies[0];
-      return formatPriceValue(inrAmount, activeCurrency);
+      const activeCurrency =
+        mounted && currency && currency.code !== 'INR' && supportedCurrencies.some((c) => c.code === currency.code)
+          ? currency
+          : supportedCurrencies[0];
+      return formatPriceValue(amount, activeCurrency);
     },
     [currency, mounted]
   );

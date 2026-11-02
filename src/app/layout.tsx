@@ -11,39 +11,61 @@ import { ScrollToTop } from '@/components/common/scroll-to-top';
 import { NavigationProgressBar } from '@/components/common/navigation-progress';
 import { Suspense } from 'react';
 
+const rawAppUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+const isLocalhost = !rawAppUrl || rawAppUrl.includes('localhost') || rawAppUrl.includes('127.0.0.1');
+
+const appBaseUrl = isLocalhost
+  ? (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : 'https://guna-pharma-org.vercel.app')
+  : rawAppUrl;
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(appBaseUrl),
   title: {
-    default: 'GUNA PHARMA - Skincare, Medicines & Wellness Products',
+    default: 'GUNA PHARMA - Global Healthcare, Medicines & Luxury Cosmetics',
     template: '%s | GUNA PHARMA',
   },
-  description: 'Premium skincare, cosmetics, medicines & wellness products delivered to your doorstep. Free delivery above ₹499. 100% genuine products.',
-  keywords: ['skincare', 'cosmetics', 'medicines', 'wellness', 'vitamins', 'supplements', 'pharmacy', 'online pharmacy'],
+  description: 'Trusted exporter of authentic prescription medicines, wellness essentials, and luxury cosmetic skincare shipping worldwide. 100% genuine guaranteed.',
+  keywords: ['skincare', 'cosmetics', 'medicines', 'wellness', 'vitamins', 'supplements', 'pharmacy', 'online pharmacy', 'pharmaceutical exporter'],
   authors: [{ name: 'GUNA PHARMA' }],
   creator: 'GUNA PHARMA',
   publisher: 'GUNA PHARMA',
   robots: 'index, follow',
+  alternates: {
+    canonical: appBaseUrl,
+  },
   openGraph: {
     type: 'website',
-    locale: 'en_IN',
-    url: 'https://gunapharma.com',
+    locale: 'en_US',
+    url: appBaseUrl,
     siteName: 'GUNA PHARMA',
-    title: 'GUNA PHARMA - Your Trusted Health & Beauty Partner',
-    description: 'Premium skincare, cosmetics, medicines & wellness products delivered to your doorstep.',
+    title: 'GUNA PHARMA - Your Health. Our Priority.',
+    description: 'Trusted exporter of authentic prescription medicines, wellness essentials, and luxury cosmetic skincare shipping worldwide. 100% genuine guaranteed.',
     images: [
       {
-        url: '/og-image.jpg',
+        url: `${appBaseUrl}/og-image.jpg`,
+        secureUrl: `${appBaseUrl}/og-image.jpg`,
         width: 1200,
         height: 630,
-        alt: 'GUNA PHARMA',
+        alt: 'GUNA PHARMA - Trusted Healthcare & Medicines',
+        type: 'image/jpeg',
+      },
+      {
+        url: `${appBaseUrl}/hero-poster-medicines.jpg`,
+        secureUrl: `${appBaseUrl}/hero-poster-medicines.jpg`,
+        width: 1200,
+        height: 896,
+        alt: 'GUNA PHARMA - Healthcare & Medicines',
+        type: 'image/jpeg',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GUNA PHARMA - Skincare, Medicines & Wellness',
-    description: 'Premium skincare, cosmetics, medicines & wellness products delivered to your doorstep.',
-    images: ['/og-image.jpg'],
+    title: 'GUNA PHARMA - Global Healthcare, Medicines & Luxury Cosmetics',
+    description: 'Discover quality medicines, premium cosmetics, and wellness essentials shipped worldwide.',
+    images: [`${appBaseUrl}/og-image.jpg`],
   },
   icons: {
     icon: '/favicon.ico',
@@ -67,6 +89,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="antialiased scrollbar-none" suppressHydrationWarning>
+      <head>
+        <meta property="og:image" content={`${appBaseUrl}/og-image.jpg`} />
+        <meta property="og:image:secure_url" content={`${appBaseUrl}/og-image.jpg`} />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="GUNA PHARMA - Trusted Healthcare & Medicines" />
+        <link rel="image_src" href={`${appBaseUrl}/og-image.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content={`${appBaseUrl}/og-image.jpg`} />
+      </head>
       <body className="min-h-screen w-full max-w-full overflow-x-hidden bg-white text-navy flex flex-col scrollbar-none" suppressHydrationWarning>
         <a
           href="#main-content"
@@ -74,6 +107,23 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Pharmacy',
+              name: 'GUNA PHARMA',
+              url: 'https://gunapharma.com',
+              logo: 'https://gunapharma.com/logo.png',
+              image: 'https://gunapharma.com/og-image.jpg',
+              description:
+                'Trusted exporter of authentic prescription medicines, wellness essentials, and luxury cosmetic skincare shipping worldwide. 100% genuine guaranteed.',
+              currenciesAccepted: 'USD, EUR, GBP, AED, SAR',
+              priceRange: '$$',
+            }),
+          }}
+        />
         <Suspense fallback={null}>
           <NavigationProgressBar />
         </Suspense>

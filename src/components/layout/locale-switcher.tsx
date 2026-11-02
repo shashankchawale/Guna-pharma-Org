@@ -18,7 +18,10 @@ export function LocaleSwitcher({ compact = false, dropup = false }: { compact?: 
   const ref = useRef<HTMLDivElement>(null);
 
   const activeLanguage = mounted ? language : supportedLanguages[0];
-  const activeCurrency = mounted ? currency : supportedCurrencies[0];
+  const activeCurrency =
+    mounted && currency && currency.code !== 'INR' && supportedCurrencies.some((c) => c.code === currency.code)
+      ? currency
+      : supportedCurrencies[0];
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -36,6 +39,7 @@ export function LocaleSwitcher({ compact = false, dropup = false }: { compact?: 
   };
 
   const chooseCurrency = (item: CurrencyConfig) => {
+    if (item.code === 'INR') return;
     setCurrency(item);
     setOpen(false);
   };
@@ -100,25 +104,27 @@ export function LocaleSwitcher({ compact = false, dropup = false }: { compact?: 
             Display Currency
           </p>
           <div className="space-y-1">
-            {supportedCurrencies.map((item) => (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => chooseCurrency(item)}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${
-                  currency.code === item.code
-                    ? 'bg-primary-light font-semibold text-primary'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <strong className="inline-block w-9 font-semibold text-navy">{item.symbol}</strong>
-                  <span className="font-medium text-navy">{item.code}</span>
-                  <span className="text-xs text-gray-400">— {item.name}</span>
-                </span>
-                {currency.code === item.code && <span className="font-bold text-primary">✓</span>}
-              </button>
-            ))}
+            {supportedCurrencies
+              .filter((item) => item.code !== 'INR')
+              .map((item) => (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={() => chooseCurrency(item)}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+                    activeCurrency.code === item.code
+                      ? 'bg-primary-light font-semibold text-primary'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <strong className="inline-block w-9 font-semibold text-navy">{item.symbol}</strong>
+                    <span className="font-medium text-navy">{item.code}</span>
+                    <span className="text-xs text-gray-400">— {item.name}</span>
+                  </span>
+                  {activeCurrency.code === item.code && <span className="font-bold text-primary">✓</span>}
+                </button>
+              ))}
           </div>
 
           <p className="px-2 pb-1 pt-3 text-[11px] leading-4 text-gray-400">

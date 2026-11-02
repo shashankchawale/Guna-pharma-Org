@@ -25,9 +25,9 @@ export const brandConfig = {
   },
 
   // Business
-  freeDeliveryThreshold: 499,
-  currency: 'INR',
-  currencySymbol: '₹',
+  freeDeliveryThreshold: 50,
+  currency: 'USD',
+  currencySymbol: '$',
 
   // Social
   social: {

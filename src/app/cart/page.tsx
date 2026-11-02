@@ -129,7 +129,7 @@ export default function CartPage() {
         shipping_amount: shippingFee,
         tax_amount: 0,
         total_amount: grandTotal,
-        currency: 'INR',
+        currency: 'USD',
         carrier: 'BlueDart Express Air',
         tracking_number: `BD-${generatedId.replace(/\D/g, '').slice(-6) || '982145'}`,
         estimated_delivery: '3-4 Business Days',

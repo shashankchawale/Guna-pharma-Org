@@ -34,68 +34,69 @@ export default async function HomePage() {
       {/* Background ambient lighting */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-300/20 via-transparent to-transparent pointer-events-none" />
 
-      <div className="relative mx-auto grid max-w-7xl items-center gap-6 lg:gap-8 px-4 pt-3 pb-6 sm:px-6 sm:pt-4 sm:pb-8 md:grid-cols-12 md:pt-4 md:pb-8 lg:pt-5 lg:pb-8">
+      <div className="relative mx-auto grid max-w-7xl items-center gap-4 lg:gap-6 px-3.5 py-3.5 sm:px-6 sm:py-4 md:grid-cols-12 md:py-4.5 lg:py-5">
         {/* Left Column: Heading, Subheading & Buttons */}
-        <div className="space-y-3.5 sm:space-y-4 md:col-span-7 lg:col-span-6 z-10">
-          <div className="inline-flex items-center gap-2">
-            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.2em] text-blue-200">
+        <div className="space-y-2 sm:space-y-2.5 md:col-span-7 lg:col-span-6 z-10">
+          <div className="inline-flex max-w-full items-center gap-1.5 sm:gap-2 rounded-full bg-white/15 px-2.5 sm:px-3 py-1 border border-white/20 backdrop-blur-sm shadow-sm">
+            <ShieldCheck className="h-3.5 w-3.5 text-blue-200 shrink-0" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">
               TRUSTED HEALTHCARE & COSMETICS
             </span>
           </div>
 
-          <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl leading-[1.08]">
+          <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-extrabold tracking-tight text-white leading-[1.12]">
             Your Health.<br />
             Our Priority.
           </h1>
 
-          <p className="max-w-xl text-sm sm:text-base leading-relaxed text-blue-100">
+          <p className="max-w-lg text-xs sm:text-sm leading-snug sm:leading-relaxed text-blue-100">
             Discover quality medicines, premium cosmetic products, and healthcare essentials from a trusted pharmaceutical exporter shipping worldwide.
           </p>
 
-          <div className="flex flex-wrap items-center gap-3.5 pt-1">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-0.5 sm:pt-1">
             <Link
               href="/medicines"
               prefetch={true}
-              className="inline-flex h-11 items-center justify-center rounded-full bg-white px-7 text-sm font-bold text-[#005AD2] shadow-md transition-all duration-200 hover:bg-blue-50 hover:shadow-lg hover:scale-105"
+              className="inline-flex h-9 sm:h-10.5 items-center justify-center rounded-full bg-white px-5 sm:px-7 text-xs sm:text-sm font-bold text-[#005AD2] shadow-md transition-all duration-200 hover:bg-blue-50 hover:shadow-lg hover:scale-105 active:scale-95"
             >
               Shop Medicines
             </Link>
 
             <Link
-              href="/catalog?category=skincare"
+              href="/wellness"
               prefetch={true}
-              className="inline-flex h-11 items-center justify-center rounded-full border-2 border-white/80 bg-transparent px-7 text-sm font-bold text-white transition-all duration-200 hover:bg-white/15 hover:border-white hover:scale-105"
+              className="inline-flex h-9 sm:h-10.5 items-center justify-center rounded-full border-2 border-white/85 bg-transparent px-5 sm:px-7 text-xs sm:text-sm font-bold text-white transition-all duration-200 hover:bg-white/15 hover:border-white hover:scale-105 active:scale-95"
             >
-              Shop Cosmetics
+              Shop Wellness
             </Link>
           </div>
 
-          <div className="pt-1 flex flex-wrap items-center gap-5 text-xs text-blue-100 font-medium">
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 100% Genuine Medicines
+          <div className="pt-0.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[11px] sm:text-xs text-blue-100/90 font-medium">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> 100% Genuine Medicines
             </span>
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-amber-300" /> Premium Cosmetics & Skincare
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-amber-300 shrink-0" /> Premium Cosmetics & Skincare
             </span>
-            <span className="flex items-center gap-1.5">
-              <Truck className="h-4 w-4 text-blue-200" /> Worldwide Shipping
+            <span className="inline-flex items-center gap-1.5">
+              <Truck className="h-3.5 w-3.5 text-blue-200 shrink-0" /> Worldwide Shipping
             </span>
           </div>
         </div>
 
         {/* Right Column: Sliding Showcase of Cosmetics & Medicines */}
-        <div className="relative md:col-span-5 lg:col-span-6 flex justify-center md:justify-end">
+        <div className="relative md:col-span-5 lg:col-span-6 flex justify-center md:justify-end w-full mt-1 md:mt-0">
           <HeroSlider />
         </div>
       </div>
     </section>
-    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <div className="grid gap-6 sm:grid-cols-2">
+    <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2">
         {/* Medicines Card */}
         <Link
           href="/medicines"
           prefetch={true}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br from-[#005AD2] via-[#0066E8] to-[#004BB8] p-6 sm:p-8 text-white shadow-card transition-all duration-300 hover:shadow-elevated hover:-translate-y-1"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br from-[#005AD2] via-[#0066E8] to-[#004BB8] p-5 sm:p-6 text-white shadow-card transition-all duration-300 hover:shadow-elevated hover:-translate-y-1"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl shadow-md ring-2 ring-white/20">

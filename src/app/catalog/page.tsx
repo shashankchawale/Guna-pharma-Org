@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useProductsStore } from '@/store/products';
 import { ProductCard } from '@/components/product/product-card';
+import { getAppBaseUrl, buildCollectionPageSchema, buildBreadcrumbSchema } from '@/lib/seo';
 
 export interface CatalogCategoryItem {
   id: string;
@@ -312,8 +313,57 @@ function CatalogContent() {
     return list;
   }, [products, selectedCategory, rawSearch, sortOption]);
 
+  const currentCategory = CATALOG_CATEGORIES.find((c) => c.id === selectedCategory);
+  const baseUrl = getAppBaseUrl();
+
+  const dynamicCategorySchema = React.useMemo(() => {
+    if (!selectedCategory || !currentCategory) return null;
+    const catName = currentCategory.name;
+    const items = filtered.slice(0, 15).map((p) => ({
+      name: p.name,
+      url: `${baseUrl}/product/${p.slug || p.id}`,
+      description: p.short_description || p.description,
+      image: p.thumbnail_url || p.images?.[0],
+    }));
+
+    return {
+      collection: buildCollectionPageSchema({
+        title: `${catName} | GUNA PHARMA`,
+        description: `Browse authentic ${catName.toLowerCase()} and healthcare products at GUNA PHARMA. Doorstep delivery worldwide.`,
+        url: `${baseUrl}/catalog?category=${selectedCategory}`,
+        items,
+      }),
+      breadcrumbs: buildBreadcrumbSchema(
+        [
+          { name: 'Home', path: '/' },
+          { name: 'Catalog', path: '/catalog' },
+          { name: catName, path: `/catalog?category=${selectedCategory}` },
+        ],
+        baseUrl
+      ),
+    };
+  }, [selectedCategory, currentCategory, filtered, baseUrl]);
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      {/* Dynamic Category Schema for active category filter */}
+      {dynamicCategorySchema && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(dynamicCategorySchema.collection),
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(dynamicCategorySchema.breadcrumbs),
+            }}
+          />
+        </>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>

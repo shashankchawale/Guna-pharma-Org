@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -7,6 +8,7 @@ import { ProductCard } from '@/components/product/product-card';
 import { ProductPrice } from '@/components/product/product-price';
 import { ProductReviews } from '@/components/product/product-reviews';
 import { AddToCart } from './purchase-actions';
+import { getAppBaseUrl, buildProductSchema, buildBreadcrumbSchema } from '@/lib/seo';
 
 export const revalidate = 60;
 export const dynamicParams = true;
@@ -18,6 +20,74 @@ export async function generateStaticParams() {
   }));
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
+  const product = await getOrFetchServerProduct(decodedSlug);
+  const baseUrl = getAppBaseUrl();
+
+  if (!product) {
+    return {
+      title: 'Product Not Found | GUNA PHARMA',
+      description: 'The requested medicine or healthcare product could not be found.',
+    };
+  }
+
+  const title = `${product.name} - Buy Online | GUNA PHARMA`;
+  const rawDesc =
+    product.short_description ||
+    product.description ||
+    `Order ${product.name} online from GUNA PHARMA. Certified authentic healthcare formulation with door-to-door delivery.`;
+  const description = rawDesc.length > 155 ? `${rawDesc.slice(0, 152)}...` : rawDesc;
+  const productUrl = `${baseUrl}/product/${product.slug || product.id}`;
+  const imageUrl = product.thumbnail_url || product.images?.[0] || `${baseUrl}/og-image.jpg`;
+  const fullImageUrl = imageUrl.startsWith('http')
+    ? imageUrl
+    : `${baseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+
+  return {
+    title,
+    description,
+    keywords: [
+      product.name,
+      product.manufacturer || '',
+      product.category_id,
+      product.composition || '',
+      ...(product.tags || []),
+      'buy medicines online',
+      'guna pharma healthcare',
+    ].filter(Boolean),
+    alternates: {
+      canonical: productUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      url: productUrl,
+      type: 'website',
+      siteName: 'GUNA PHARMA',
+      images: [
+        {
+          url: fullImageUrl,
+          width: 800,
+          height: 800,
+          alt: product.name,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [fullImageUrl],
+    },
+  };
+}
+
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const decodedSlug = decodeURIComponent(slug);
@@ -25,6 +95,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const product = await getOrFetchServerProduct(decodedSlug);
   if (!product) notFound();
 
+  const baseUrl = getAppBaseUrl();
   const all = getServerProducts();
   const related = all
     .filter((item) => item.category_id === product.category_id && item.id !== product.id)
@@ -32,13 +103,44 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
   const imageUrl = product.thumbnail_url || product.images?.[0];
 
+  // Schema.org structured data (JSON-LD)
+  const productSchema = buildProductSchema(product, baseUrl);
+  const categoryLabel = product.category_id ? product.category_id.replace(/-/g, ' ') : 'Healthcare';
+  const breadcrumbSchema = buildBreadcrumbSchema(
+    [
+      { name: 'Home', path: '/' },
+      { name: 'Shop Catalog', path: '/catalog' },
+      { name: categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1), path: `/catalog?category=${product.category_id}` },
+      { name: product.name, path: `/product/${product.slug || product.id}` },
+    ],
+    baseUrl
+  );
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      {/* Schema.org Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbSchema),
+        }}
+      />
+
       {/* Breadcrumb */}
       <nav className="mb-6 flex items-center gap-1.5 text-xs text-gray-500">
         <Link href="/" className="hover:text-primary transition-colors">Home</Link>
         <ChevronRight className="h-3 w-3" />
         <Link href="/catalog" className="hover:text-primary transition-colors">Shop</Link>
+        <ChevronRight className="h-3 w-3" />
+        <Link href={`/catalog?category=${product.category_id}`} className="hover:text-primary transition-colors capitalize">
+          {categoryLabel}
+        </Link>
         <ChevronRight className="h-3 w-3" />
         <span className="font-semibold text-navy truncate">{product.name}</span>
       </nav>

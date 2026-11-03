@@ -8,7 +8,6 @@ interface Slide {
   id: string;
   image: string;
   alt: string;
-  badge: string;
   tag: string;
 }
 
@@ -17,21 +16,18 @@ const slides: Slide[] = [
     id: 'hybrid',
     image: '/hero-poster-products.jpg',
     alt: 'Cosmetics & Medicines: Hyaluronic acid serum, revitalizing cream, Omega-3, and analgesic tablets',
-    badge: 'Cosmetic Skincare & Quality Medicines',
     tag: 'Featured',
   },
   {
     id: 'cosmetics',
     image: '/hero-poster-cosmetics.jpg',
     alt: 'Luxury Cosmetics & Skincare: Advanced repair moisturizer, vitamin C glow serum, renewal cream, and SPF 50 sunscreen',
-    badge: 'Luxury Skincare, Serums & Sunscreen',
     tag: 'Cosmetics',
   },
   {
     id: 'medicines',
     image: '/hero-poster-medicines.jpg',
     alt: 'Pharmaceutical Medicines: Novaclind capsules, Vita-B complex, paracetamol oral suspension, and antibiotic blister packs',
-    badge: 'Clinical Medicines & Prescription Essentials',
     tag: 'Medicines',
   },
 ];
@@ -92,12 +88,6 @@ export function HeroSlider() {
 
         {/* Subtle ambient bottom gradient (kept light so all products remain fully visible) */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#001D47]/45 via-transparent to-transparent z-10 pointer-events-none" />
-
-        {/* Floating Badge Overlay with max-width protection so it never collides with dots */}
-        <div className="absolute bottom-2 left-2 sm:bottom-2.5 sm:left-2.5 z-20 max-w-[calc(100%-80px)] sm:max-w-[72%] rounded-full bg-white/95 backdrop-blur-md px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold text-navy shadow-md flex items-center gap-1.5 transition-all duration-300">
-          <span className="inline-block h-1.5 w-1.5 sm:h-2 sm:w-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="truncate">{slides[currentIndex].badge}</span>
-        </div>
 
         {/* Navigation Arrows */}
         <button

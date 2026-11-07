@@ -51,9 +51,9 @@ export function FeaturedProducts({ initialProducts = [] }: FeaturedProductsProps
       } catch {}
     }
 
-    const source = mounted && isHydrated && products.length > 0 ? products : initialProducts;
+    const source = mounted && isHydrated ? products : initialProducts;
 
-    const filtered = source.filter((p) => {
+    const filtered = (source || []).filter((p) => {
       const idLower = (p.id || '').trim().toLowerCase();
       const slugLower = (p.slug || '').trim().toLowerCase();
       return !deletedSet.has(idLower) && !deletedSet.has(slugLower);

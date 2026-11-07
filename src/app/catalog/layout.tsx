@@ -57,9 +57,44 @@ export default function CatalogLayout({
     url: `${baseUrl}/catalog`,
     items: [
       {
-        name: 'Medicines (Rx & OTC)',
+        name: 'Medicines & Pharmaceuticals',
         url: `${baseUrl}/catalog?category=medicines`,
-        description: 'Quality-assured prescription pharmaceuticals and generic therapeutics.',
+        description: 'Certified medicines across 13 specialized categories including ED, Steroids, Antibiotics, and more.',
+      },
+      {
+        name: 'Erectile Dysfunction',
+        url: `${baseUrl}/catalog?category=erectile-dysfunction`,
+        description: 'Certified PDE-5 therapies and vitality formulations.',
+      },
+      {
+        name: 'Steroids & Corticoids',
+        url: `${baseUrl}/catalog?category=steroids`,
+        description: 'Quality-assured anti-inflammatory and hormonal therapies.',
+      },
+      {
+        name: 'Anti Anxiety',
+        url: `${baseUrl}/catalog?category=anti-anxiety`,
+        description: 'Certified anxiolytic therapies for stress and anxiety care.',
+      },
+      {
+        name: 'Pain Killers',
+        url: `${baseUrl}/catalog?category=pain-killers`,
+        description: 'Effective analgesic pain relief formulations.',
+      },
+      {
+        name: 'Antibiotics',
+        url: `${baseUrl}/catalog?category=antibiotics`,
+        description: 'Broad-spectrum antimicrobials and infection treatments.',
+      },
+      {
+        name: 'Weight Loss & Metabolic',
+        url: `${baseUrl}/catalog?category=weight-loss`,
+        description: 'Clinically verified metabolic and weight management therapies.',
+      },
+      {
+        name: 'Clinical Skincare & Derma',
+        url: `${baseUrl}/catalog?category=skincare`,
+        description: 'Dermatologist-recommended serums, barrier repair creams, and skin topicals.',
       },
       {
         name: 'Beauty Care & Cosmetics',
@@ -67,39 +102,9 @@ export default function CatalogLayout({
         description: 'Premium cosmetic essentials, glam skincare, and luxury beauty items.',
       },
       {
-        name: 'Pain Relief & Balms',
-        url: `${baseUrl}/catalog?category=pain-relief`,
-        description: 'Fast-acting analgesic sprays, herbal balms, and pain relief ointments.',
-      },
-      {
-        name: 'Fever & Cold Care',
-        url: `${baseUrl}/catalog?category=fever`,
-        description: 'Clinical antipyretics, cough syrups, inhalers, and cold recovery formulations.',
-      },
-      {
-        name: 'Clinical Skincare & Derma',
-        url: `${baseUrl}/catalog?category=skincare`,
-        description: 'Dermatologist-recommended serums, barrier repair creams, and cleansers.',
-      },
-      {
         name: 'Wellness & Daily Health',
         url: `${baseUrl}/catalog?category=wellness`,
-        description: 'Daily multivitamins, antioxidants, omega fatty acids, and immunity boosters.',
-      },
-      {
-        name: 'Hair Care & Scalp Therapy',
-        url: `${baseUrl}/catalog?category=hair-care`,
-        description: 'Clinical minoxidil solutions, follicle nourishment serums, and scalp care.',
-      },
-      {
-        name: 'Digestive & Gut Health',
-        url: `${baseUrl}/catalog?category=digestive-health`,
-        description: 'Fast antacids, prebiotic gut support, and digestive enzyme syrups.',
-      },
-      {
-        name: 'First Aid & Wound Care',
-        url: `${baseUrl}/catalog?category=first-aid`,
-        description: 'Antiseptic solutions, bandages, surgical tapes, and wound care kits.',
+        description: 'Daily multivitamins, antioxidants, omega fatty acids, and vitality essentials.',
       },
     ],
   });

@@ -213,6 +213,21 @@ export async function deleteSupabaseProduct(id: string): Promise<{ success: bool
   }
 }
 
+export async function deleteAllSupabaseProducts(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from('products').delete().neq('id', '___NONE___');
+    if (error) {
+      console.warn('Could not delete all from Supabase products:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.warn('Supabase delete all exception:', err);
+    return { success: false, error: err?.message || 'Delete all failed' };
+  }
+}
+
 export async function syncAllProductsToSupabase(products: Product[]): Promise<{
   success: boolean;
   syncedCount: number;

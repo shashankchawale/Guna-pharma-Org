@@ -6,12 +6,14 @@ import {
   updateServerProduct,
   deleteServerProduct,
   restoreAllServerProducts,
+  clearAllProductsCompletely,
 } from '@/lib/server-catalog';
 import {
   checkSupabaseHealth,
   syncAllProductsToSupabase,
   upsertSupabaseProduct,
   deleteSupabaseProduct,
+  deleteAllSupabaseProducts,
 } from '@/lib/supabase-catalog';
 import type { Product } from '@/types';
 
@@ -27,6 +29,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(health, {
         headers: { 'Cache-Control': 'no-store' },
       });
+    }
+
+    if (searchParams.get('action') === 'clear_all') {
+      clearAllProductsCompletely();
+      const subRes = await deleteAllSupabaseProducts();
+      return NextResponse.json(
+        {
+          success: true,
+          count: 0,
+          supabaseDeleted: subRes.success,
+          message: 'All products removed from database and Supabase',
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     const cookieHeader = req.cookies.get('guna_deleted_ids')?.value;
@@ -72,9 +88,23 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+    if (searchParams.get('action') === 'clear_all') {
+      clearAllProductsCompletely();
+      const subRes = await deleteAllSupabaseProducts();
+      return NextResponse.json(
+        {
+          success: true,
+          count: 0,
+          supabaseDeleted: subRes.success,
+          message: 'All products permanently removed from database and Supabase',
+        },
+        { status: 200 }
+      );
+    }
+
     if (searchParams.get('action') === 'restore') {
       restoreAllServerProducts();
-      return NextResponse.json({ success: true, message: 'All deleted products restored' }, { status: 200 });
+      return NextResponse.json({ success: true, message: 'Catalog reset' }, { status: 200 });
     }
 
     if (searchParams.get('action') === 'seed_supabase') {
@@ -130,6 +160,26 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+
+    if (searchParams.get('action') === 'clear_all') {
+      clearAllProductsCompletely();
+      const subRes = await deleteAllSupabaseProducts();
+      return NextResponse.json(
+        {
+          success: true,
+          count: 0,
+          supabaseDeleted: subRes.success,
+          message: 'All products permanently removed from database and Supabase',
+        },
+        {
+          status: 200,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      );
+    }
+
     let id = searchParams.get('id');
     let slug = searchParams.get('slug');
 

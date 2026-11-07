@@ -20,6 +20,11 @@ import {
 import { useProductsStore } from '@/store/products';
 import { ProductCard } from '@/components/product/product-card';
 import { getAppBaseUrl, buildCollectionPageSchema, buildBreadcrumbSchema } from '@/lib/seo';
+import {
+  MEDICINE_CATEGORIES,
+  MEDICINE_CATEGORY_IDS,
+  matchesMedicineCategory,
+} from '@/lib/medicine-categories';
 
 export interface CatalogCategoryItem {
   id: string;
@@ -31,6 +36,126 @@ export interface CatalogCategoryItem {
   iconBg: string;
 }
 
+const MEDICINE_CATALOG_ITEMS: CatalogCategoryItem[] = [
+  {
+    id: 'erectile-dysfunction',
+    name: 'ERECTILE DYSFUNCTION',
+    sub: 'Sildenafil & PDE-5',
+    emoji: '⚡',
+    badge: 'Popular',
+    bgGradient: 'from-blue-50 to-indigo-50/60',
+    iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-blue-500/20',
+  },
+  {
+    id: 'steroids',
+    name: 'STEROIDS',
+    sub: 'Corticoids & Anti-inflamm',
+    emoji: '💉',
+    badge: 'Clinical',
+    bgGradient: 'from-amber-50 to-orange-50/60',
+    iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-amber-500/20',
+  },
+  {
+    id: 'anti-anxiety',
+    name: 'ANTI ANXIETY',
+    sub: 'Etizolam & Alprazolam',
+    emoji: '🧘',
+    badge: 'Calm',
+    bgGradient: 'from-teal-50 to-emerald-50/60',
+    iconBg: 'bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-teal-500/20',
+  },
+  {
+    id: 'anti-parasitic',
+    name: 'ANTI PARASITIC',
+    sub: 'Ivermectin & Albendazole',
+    emoji: '🔬',
+    badge: 'Care',
+    bgGradient: 'from-purple-50 to-violet-50/60',
+    iconBg: 'bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-purple-500/20',
+  },
+  {
+    id: 'pain-killers',
+    name: 'PAIN KILLERS',
+    sub: 'Tapentadol & Tramadol',
+    emoji: '🩹',
+    badge: 'Relief',
+    bgGradient: 'from-rose-50 to-red-50/60',
+    iconBg: 'bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-rose-500/20',
+  },
+  {
+    id: 'sleeping-pills',
+    name: 'SLEEPING PILLS',
+    sub: 'Zopiclone & Zolpidem',
+    emoji: '🌙',
+    badge: 'Night',
+    bgGradient: 'from-indigo-50 to-sky-50/60',
+    iconBg: 'bg-gradient-to-br from-indigo-500 to-sky-600 text-white shadow-indigo-500/20',
+  },
+  {
+    id: 'weight-loss',
+    name: 'WEIGHT LOSS',
+    sub: 'Semaglutide & Orlistat',
+    emoji: '⚖️',
+    badge: 'Metabolic',
+    bgGradient: 'from-emerald-50 to-teal-50/60',
+    iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20',
+  },
+  {
+    id: 'antibiotics',
+    name: 'ANTIBIOTICS',
+    sub: 'Amoxicillin & Azithral',
+    emoji: '🛡️',
+    badge: 'Rx',
+    bgGradient: 'from-cyan-50 to-blue-50/60',
+    iconBg: 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-cyan-500/20',
+  },
+  {
+    id: 'anti-diabetics',
+    name: 'ANTI DIABETICS',
+    sub: 'Metformin & Glimepiride',
+    emoji: '🩸',
+    badge: 'Glycemic',
+    bgGradient: 'from-red-50 to-pink-50/60',
+    iconBg: 'bg-gradient-to-br from-red-500 to-pink-600 text-white shadow-red-500/20',
+  },
+  {
+    id: 'antihypertensive',
+    name: 'ANTIHYPERTENSIVE',
+    sub: 'Telmisartan & Amlodipine',
+    emoji: '❤️',
+    badge: 'Cardio',
+    bgGradient: 'from-rose-50 to-orange-50/60',
+    iconBg: 'bg-gradient-to-br from-rose-500 to-orange-600 text-white shadow-rose-500/20',
+  },
+  {
+    id: 'human-growth-hormones',
+    name: 'HUMAN GROWTH HORMONES',
+    sub: 'Somatropin & Peptides',
+    emoji: '🧬',
+    badge: 'Vitality',
+    bgGradient: 'from-violet-50 to-purple-50/60',
+    iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-violet-500/20',
+  },
+  {
+    id: 'skin-cream',
+    name: 'SKIN CREAM',
+    sub: 'Retino-A & Hydroquinone',
+    emoji: '🧴',
+    badge: 'Derma',
+    bgGradient: 'from-pink-50 to-rose-50/60',
+    iconBg: 'bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-pink-500/20',
+  },
+  {
+    id: 'antiemetics',
+    name: 'ANTIEMETICS',
+    sub: 'Ondansetron & Vomistop',
+    emoji: '🌿',
+    badge: 'Care',
+    bgGradient: 'from-emerald-50 to-green-50/60',
+    iconBg: 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-emerald-500/20',
+  },
+];
+
 const CATALOG_CATEGORIES: CatalogCategoryItem[] = [
   {
     id: '',
@@ -40,14 +165,15 @@ const CATALOG_CATEGORIES: CatalogCategoryItem[] = [
     bgGradient: 'from-blue-50 to-indigo-50/60',
     iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-blue-500/20',
   },
+  ...MEDICINE_CATALOG_ITEMS,
   {
-    id: 'medicines',
-    name: 'Medicines',
-    sub: 'Rx & Tablets',
-    emoji: '💊',
-    badge: 'Rx & OTC',
-    bgGradient: 'from-rose-50 to-pink-50/60',
-    iconBg: 'bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-rose-500/20',
+    id: 'skincare',
+    name: 'Skincare',
+    sub: 'Derma & Creams',
+    emoji: '✨',
+    badge: 'Derma',
+    bgGradient: 'from-sky-50 to-blue-50/60',
+    iconBg: 'bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-sky-500/20',
   },
   {
     id: 'beauty',
@@ -59,33 +185,6 @@ const CATALOG_CATEGORIES: CatalogCategoryItem[] = [
     iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-pink-500/20',
   },
   {
-    id: 'pain-relief',
-    name: 'Pain Relief',
-    sub: 'Balms & Sprays',
-    emoji: '🩹',
-    badge: 'Fast Relief',
-    bgGradient: 'from-amber-50 to-orange-50/60',
-    iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-amber-500/20',
-  },
-  {
-    id: 'fever',
-    name: 'Fever & Cold',
-    sub: 'Syrups & Tablets',
-    emoji: '🌡️',
-    badge: 'Clinical',
-    bgGradient: 'from-teal-50 to-emerald-50/60',
-    iconBg: 'bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-teal-500/20',
-  },
-  {
-    id: 'skincare',
-    name: 'Skincare',
-    sub: 'Derma & Creams',
-    emoji: '✨',
-    badge: 'Derma',
-    bgGradient: 'from-sky-50 to-blue-50/60',
-    iconBg: 'bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-sky-500/20',
-  },
-  {
     id: 'wellness',
     name: 'Wellness',
     sub: 'Vitamins & Health',
@@ -93,31 +192,6 @@ const CATALOG_CATEGORIES: CatalogCategoryItem[] = [
     badge: 'Nutrition',
     bgGradient: 'from-orange-50 to-amber-50/60',
     iconBg: 'bg-gradient-to-br from-orange-400 to-amber-600 text-white shadow-orange-500/20',
-  },
-  {
-    id: 'hair-care',
-    name: 'Hair Care',
-    sub: 'Serums & Scalp',
-    emoji: '💆',
-    badge: 'Salon Pro',
-    bgGradient: 'from-purple-50 to-violet-50/60',
-    iconBg: 'bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-purple-500/20',
-  },
-  {
-    id: 'digestive-health',
-    name: 'Digestion',
-    sub: 'Gut & Antacids',
-    emoji: '🌱',
-    bgGradient: 'from-emerald-50 to-green-50/60',
-    iconBg: 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-emerald-500/20',
-  },
-  {
-    id: 'first-aid',
-    name: 'First Aid',
-    sub: 'Antiseptics',
-    emoji: '➕',
-    bgGradient: 'from-red-50 to-rose-50/60',
-    iconBg: 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-red-500/20',
   },
 ];
 
@@ -221,52 +295,21 @@ function CatalogContent() {
         const prodName = (product.name || '').toLowerCase();
         const prodTags = (product.tags || []).map((t) => (t || '').toLowerCase());
 
-        if (selectedCategory === 'medicines') {
+        if (MEDICINE_CATEGORY_IDS.includes(selectedCategory)) {
+          matchesCategory = matchesMedicineCategory(product, selectedCategory);
+        } else if (selectedCategory === 'medicines') {
           matchesCategory =
-            ['medicines', 'pharma', 'pain-relief', 'cold-flu', 'first-aid', 'digestive-health'].includes(prodCat) ||
-            Boolean(product.requires_prescription) ||
-            prodTags.includes('medicines');
+            MEDICINE_CATEGORY_IDS.includes(prodCat) ||
+            prodCat === 'medicines' ||
+            Boolean(product.requires_prescription);
         } else if (selectedCategory === 'beauty') {
-          matchesCategory =
-            ['beauty', 'cosmetics', 'hair-care', 'skincare', 'makeup'].includes(prodCat) ||
-            prodTags.some((t) => ['beauty', 'cosmetics', 'makeup'].includes(t));
-        } else if (selectedCategory === 'pain-relief') {
-          matchesCategory =
-            ['pain-relief', 'pain'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('pain') || t.includes('balm') || t.includes('relief')) ||
-            prodName.includes('balm') || prodName.includes('pain') || prodName.includes('tydol');
-        } else if (selectedCategory === 'fever' || selectedCategory === 'cold-flu') {
-          matchesCategory =
-            ['cold-flu', 'fever', 'cold'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('fever') || t.includes('cold') || t.includes('cough') || t.includes('inhaler') || t.includes('flu')) ||
-            prodName.includes('cold') || prodName.includes('cough') || prodName.includes('fever') || prodName.includes('paracetamol');
+          matchesCategory = prodCat === 'beauty';
         } else if (selectedCategory === 'skincare') {
-          matchesCategory =
-            ['skincare', 'body-care', 'skin'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('skin') || t.includes('serum') || t.includes('acne') || t.includes('moisturizer')) ||
-            prodName.includes('serum') || prodName.includes('wash') || prodName.includes('moisturizer') || prodName.includes('ceramide');
+          matchesCategory = prodCat === 'skincare';
         } else if (selectedCategory === 'wellness') {
-          matchesCategory =
-            ['wellness', 'vitamins', 'supplements', 'ayurveda', 'herbal'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('wellness') || t.includes('vitamin') || t.includes('omega') || t.includes('gumm') || t.includes('antioxidant')) ||
-            prodName.includes('omega') || prodName.includes('glutathione') || prodName.includes('gummy') || prodName.includes('multivitamin');
-        } else if (selectedCategory === 'hair-care') {
-          matchesCategory =
-            ['hair-care', 'hair'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('hair') || t.includes('scalp') || t.includes('shampoo') || t.includes('minoxidil')) ||
-            prodName.includes('serum') || prodName.includes('shampoo') || prodName.includes('minoxidil') || prodName.includes('bontress');
-        } else if (selectedCategory === 'digestive-health') {
-          matchesCategory =
-            ['digestive-health', 'digestion'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('digest') || t.includes('antacid') || t.includes('gut')) ||
-            prodName.includes('digest');
-        } else if (selectedCategory === 'first-aid') {
-          matchesCategory =
-            ['first-aid', 'wound-care'].includes(prodCat) ||
-            prodTags.some((t) => t.includes('first-aid') || t.includes('antiseptic') || t.includes('bandage')) ||
-            prodName.includes('betadine') || prodName.includes('bandage');
+          matchesCategory = prodCat === 'wellness';
         } else {
-          matchesCategory = prodCat === selectedCategory || prodTags.includes(selectedCategory);
+          matchesCategory = prodCat === selectedCategory;
         }
       }
 

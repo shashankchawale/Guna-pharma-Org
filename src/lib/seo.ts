@@ -4,14 +4,22 @@ import type { Product } from '@/types';
  * Resolves the canonical base URL for SEO metadata and structured data
  */
 export function getAppBaseUrl(): string {
-  const rawAppUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-  const isLocalhost = !rawAppUrl || rawAppUrl.includes('localhost') || rawAppUrl.includes('127.0.0.1');
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    const raw = process.env.NEXT_PUBLIC_APP_URL;
+    if (!raw.includes('localhost') && !raw.includes('127.0.0.1')) {
+      return raw.startsWith('http') ? raw : `https://${raw}`;
+    }
+  }
 
-  return isLocalhost
-    ? (process.env.VERCEL_PROJECT_PRODUCTION_URL
-        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-        : 'https://guna-pharma-org.vercel.app')
-    : rawAppUrl;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return 'https://guna-pharma-org.vercel.app';
 }
 
 /**

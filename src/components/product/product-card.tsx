@@ -42,12 +42,21 @@ export function ProductCard({ product }: { product: Product }) {
       return product.tags[0].toUpperCase();
     }
     const catMap: Record<string, string> = {
-      'pain-relief': 'PAIN RELIEF & FEVER',
+      'erectile-dysfunction': 'ERECTILE DYSFUNCTION',
+      'steroids': 'STEROIDS',
+      'anti-anxiety': 'ANTI ANXIETY',
+      'anti-parasitic': 'ANTI PARASITIC',
+      'pain-killers': 'PAIN KILLERS',
+      'sleeping-pills': 'SLEEPING PILLS',
+      'weight-loss': 'WEIGHT LOSS',
+      'antibiotics': 'ANTIBIOTICS',
+      'anti-diabetics': 'ANTI DIABETICS',
+      'antihypertensive': 'ANTIHYPERTENSIVE',
+      'human-growth-hormones': 'HUMAN GROWTH HORMONES',
+      'skin-cream': 'SKIN CREAM',
+      'antiemetics': 'ANTIEMETICS',
       'skincare': 'SKINCARE & DERMA',
-      'cold-flu': 'COLD, COUGH & FLU',
       'vitamins': 'VITAMINS & MINERALS',
-      'digestive-health': 'DIGESTIVE CARE',
-      'first-aid': 'FIRST AID & WOUND',
       'hair-care': 'HAIR & SCALP SERUMS',
       'medicines': 'CLINICAL PHARMACY',
     };

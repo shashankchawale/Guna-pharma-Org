@@ -6,25 +6,21 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Filter, ShieldAlert, Sparkles } from 'lucide-react';
 import { useProductsStore } from '@/store/products';
+import {
+  MEDICINE_CATEGORIES,
+  MEDICINE_CATEGORY_IDS,
+  matchesMedicineCategory,
+} from '@/lib/medicine-categories';
 import { ProductCard } from '@/components/product/product-card';
 import type { Product } from '@/types';
 
-const MEDICINE_CATEGORY_IDS = [
-  'medicines',
-  'pain-relief',
-  'cold-flu',
-  'digestive-health',
-  'first-aid',
-];
-
 const subcategories = [
-  { id: 'all', label: 'All Medicines' },
-  { id: 'medicines', label: 'General Medicines' },
-  { id: 'pain-relief', label: 'Pain Relief & Fever' },
-  { id: 'cold-flu', label: 'Cold, Cough & Flu' },
-  { id: 'digestive-health', label: 'Digestive Health' },
-  { id: 'first-aid', label: 'First Aid & Wound Care' },
-  { id: 'prescription', label: 'Prescription Only (Rx)' },
+  { id: 'all', label: 'All Medicines', name: 'ALL MEDICINES' },
+  ...MEDICINE_CATEGORIES.map((c) => ({
+    id: c.id,
+    label: c.label,
+    name: c.name,
+  })),
 ];
 
 function MedicinesContent() {
@@ -42,8 +38,10 @@ function MedicinesContent() {
 
   // Determine if a product belongs in the Medicines department
   const isMedicineProduct = React.useCallback((product: Product) => {
-    // 1. Explicit medicine categories
-    if (MEDICINE_CATEGORY_IDS.includes(product.category_id)) return true;
+    // 1. Explicit medicine categories or subcategories
+    if (product.category_id === 'medicines' || MEDICINE_CATEGORY_IDS.includes(product.category_id)) {
+      return true;
+    }
 
     // 2. Prescription required items
     if (product.requires_prescription) return true;
@@ -51,17 +49,14 @@ function MedicinesContent() {
     // 3. User created admin products under medicine categories
     if (product.id?.startsWith('prod-') && (
       product.category_id === 'medicines' ||
-      product.category_id === 'pain-relief' ||
-      product.category_id === 'cold-flu' ||
-      product.category_id === 'digestive-health' ||
-      product.category_id === 'first-aid'
+      MEDICINE_CATEGORY_IDS.includes(product.category_id)
     )) {
       return true;
     }
 
     // 4. Keyword heuristic on name/tags/composition/sku
     const textBlob = `${product.name} ${product.category_id} ${product.composition || ''} ${(product.tags || []).join(' ')} ${product.short_description || ''}`.toLowerCase();
-    const medicineRegex = /(medicine|pharma|tablet|capsule|syrup|paracetamol|crocin|dolo|ibuprofen|fever|cough|flu|antacid|digestive|ointment|antiseptic|pain|wound|antibiotic|rx|drops|gel|cream|suspension|spray|inhaler|injection|insulin|dose|mg|ml|patch|bandage)/i;
+    const medicineRegex = /(medicine|pharma|tablet|capsule|syrup|paracetamol|crocin|dolo|ibuprofen|fever|cough|flu|antacid|digestive|ointment|antiseptic|pain|wound|antibiotic|rx|drops|gel|cream|suspension|spray|inhaler|injection|insulin|dose|mg|ml|sildenafil|tadalafil|steroid|prednisolone|dexamethasone|etizolam|alprazolam|ivermectin|albendazole|tapentadol|tramadol|zopiclone|zolpidem|semaglutide|orlistat|amoxicillin|azithromycin|metformin|telmisartan|somatropin|tretinoin|ondansetron|domperidone)/i;
     return medicineRegex.test(textBlob);
   }, []);
 
@@ -78,14 +73,7 @@ function MedicinesContent() {
       }
 
       if (currentFilter === 'all') return true;
-      if (currentFilter === 'prescription') return product.requires_prescription;
-      if (currentFilter === 'medicines') {
-        return (
-          product.category_id === 'medicines' ||
-          (!['pain-relief', 'cold-flu', 'digestive-health', 'first-aid'].includes(product.category_id) && isMedicineProduct(product))
-        );
-      }
-      return product.category_id === currentFilter;
+      return matchesMedicineCategory(product, currentFilter);
     });
   }, [products, currentFilter, isMedicineProduct, searchQuery]);
 
@@ -97,7 +85,17 @@ function MedicinesContent() {
           Home
         </Link>
         <ChevronRight className="h-3 w-3" />
-        <span className="font-semibold text-navy">Medicines</span>
+        <Link href="/medicines" className="hover:text-primary transition-colors">
+          Medicines
+        </Link>
+        {currentFilter !== 'all' && (
+          <>
+            <ChevronRight className="h-3 w-3" />
+            <span className="font-semibold text-navy">
+              {subcategories.find((s) => s.id === currentFilter)?.label || currentFilter}
+            </span>
+          </>
+        )}
       </nav>
 
       {/* Hero Banner for Pharmacy Department */}
@@ -106,8 +104,11 @@ function MedicinesContent() {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="max-w-xl">
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
-              Quality Clinical Medicines & First Aid
+              Clinical Medicines & Therapeutics
             </h1>
+            <p className="mt-2 text-xs sm:text-sm text-blue-100 max-w-lg">
+              Explore 13 therapeutic categories including Erectile Dysfunction, Steroids, Anti Anxiety, Antibiotics, Pain Killers, and more.
+            </p>
           </div>
           <div className="relative shrink-0 w-full md:w-72 lg:w-80 h-44 sm:h-48 md:h-40 rounded-2xl overflow-hidden shadow-lg border-2 border-white/20">
             <Image
@@ -130,13 +131,13 @@ function MedicinesContent() {
             <Link
               key={sub.id}
               href={sub.id === 'all' ? '/medicines' : `/medicines?filter=${sub.id}`}
-              className={`whitespace-nowrap rounded-xl border px-4 py-2 text-xs sm:text-sm font-semibold transition-colors ${
+              className={`whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-bold tracking-tight transition-all uppercase ${
                 isActive
-                  ? 'border-primary bg-primary text-white shadow-soft'
-                  : 'border-border bg-white text-gray-700 hover:bg-primary-light hover:text-primary'
+                  ? 'border-primary bg-primary text-white shadow-soft scale-[1.02]'
+                  : 'border-border bg-white text-gray-700 hover:bg-blue-50/80 hover:text-primary hover:border-blue-200'
               }`}
             >
-              {sub.label}
+              {sub.name}
             </Link>
           );
         })}
@@ -147,8 +148,13 @@ function MedicinesContent() {
         <div>
           <p className="text-sm font-medium text-gray-500">
             Showing <span className="font-bold text-navy">{medicineProducts.length}</span> verified medicines
+            {currentFilter !== 'all' && (
+              <span className="ml-1 text-primary font-bold">
+                in {subcategories.find((s) => s.id === currentFilter)?.name || currentFilter.toUpperCase()}
+              </span>
+            )}
             {searchQuery && (
-              <span className="ml-1 text-primary">
+              <span className="ml-1 text-gray-600">
                 matching &ldquo;{searchQuery}&rdquo;
               </span>
             )}

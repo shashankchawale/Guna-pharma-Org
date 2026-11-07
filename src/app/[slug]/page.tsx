@@ -1,5 +1,7 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getAppBaseUrl } from '@/lib/seo';
 
 const pages: Record<string, { title: string; text: string }> = {
   about: {
@@ -74,6 +76,55 @@ const pages: Record<string, { title: string; text: string }> = {
 
 export function generateStaticParams() {
   return Object.keys(pages).map((slug) => ({ slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const page = pages[slug];
+  const baseUrl = getAppBaseUrl();
+
+  if (!page) {
+    return {
+      title: 'Page Not Found | GUNA PHARMA',
+    };
+  }
+
+  const title = `${page.title} | GUNA PHARMA`;
+  const description = page.text.length > 155 ? `${page.text.slice(0, 152)}...` : page.text;
+  const url = `${baseUrl}/${slug}`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: 'website',
+      siteName: 'GUNA PHARMA',
+      images: [
+        {
+          url: `${baseUrl}/og-image.jpg`,
+          width: 1200,
+          height: 630,
+          alt: page.title,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [`${baseUrl}/og-image.jpg`],
+    },
+  };
 }
 
 export default async function ContentPage({

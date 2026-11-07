@@ -10,15 +10,9 @@ import { WhatsAppButton } from '@/components/common/whatsapp-button';
 import { ScrollToTop } from '@/components/common/scroll-to-top';
 import { NavigationProgressBar } from '@/components/common/navigation-progress';
 import { Suspense } from 'react';
+import { getAppBaseUrl } from '@/lib/seo';
 
-const rawAppUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-const isLocalhost = !rawAppUrl || rawAppUrl.includes('localhost') || rawAppUrl.includes('127.0.0.1');
-
-const appBaseUrl = isLocalhost
-  ? (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : 'https://guna-pharma-org.vercel.app')
-  : rawAppUrl;
+const appBaseUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(appBaseUrl),
@@ -51,14 +45,6 @@ export const metadata: Metadata = {
         alt: 'GUNA PHARMA - Trusted Healthcare & Medicines',
         type: 'image/jpeg',
       },
-      {
-        url: `${appBaseUrl}/hero-poster-medicines.jpg`,
-        secureUrl: `${appBaseUrl}/hero-poster-medicines.jpg`,
-        width: 1200,
-        height: 896,
-        alt: 'GUNA PHARMA - Healthcare & Medicines',
-        type: 'image/jpeg',
-      },
     ],
   },
   twitter: {
@@ -89,17 +75,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="antialiased scrollbar-none" suppressHydrationWarning>
-      <head>
-        <meta property="og:image" content={`${appBaseUrl}/og-image.jpg`} />
-        <meta property="og:image:secure_url" content={`${appBaseUrl}/og-image.jpg`} />
-        <meta property="og:image:type" content="image/jpeg" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="GUNA PHARMA - Trusted Healthcare & Medicines" />
-        <link rel="image_src" href={`${appBaseUrl}/og-image.jpg`} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content={`${appBaseUrl}/og-image.jpg`} />
-      </head>
       <body className="min-h-screen w-full max-w-full overflow-x-hidden bg-white text-navy flex flex-col scrollbar-none" suppressHydrationWarning>
         <a
           href="#main-content"

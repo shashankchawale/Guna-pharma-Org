@@ -57,9 +57,9 @@ export function normalizeProduct(p: any): Product {
 
   const rawCategory = (p.category_id || (typeof p.category === 'string' ? p.category : '') || 'medicines').toLowerCase();
   let categoryId = rawCategory;
-  if (['medicine', 'pharma', 'pain-relief', 'cold-flu', 'first-aid', 'digestive-health'].includes(rawCategory)) {
+  if (['medicine', 'pharma'].includes(rawCategory)) {
     categoryId = 'medicines';
-  } else if (['cosmetic', 'cosmetics', 'beauty', 'hair-care', 'makeup'].includes(rawCategory)) {
+  } else if (['cosmetic', 'cosmetics', 'beauty', 'makeup'].includes(rawCategory)) {
     categoryId = 'beauty';
   } else if (['skin', 'dermatology', 'skincare', 'body-care'].includes(rawCategory)) {
     categoryId = 'skincare';
@@ -174,7 +174,7 @@ export function loadDatabaseCatalog(): Product[] {
     if (fs.existsSync(PRODUCTS_DB_FILE)) {
       const content = fs.readFileSync(PRODUCTS_DB_FILE, 'utf-8');
       const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed.map(normalizeProduct);
       }
     }
@@ -182,12 +182,25 @@ export function loadDatabaseCatalog(): Product[] {
     console.warn('Error reading database catalog file:', err);
   }
 
-  const initial = seedProducts.map(normalizeProduct);
+  const initial: Product[] = [];
   try {
     ensureDataDir();
     fs.writeFileSync(PRODUCTS_DB_FILE, JSON.stringify(initial, null, 2), 'utf-8');
   } catch {}
   return initial;
+}
+
+export function clearAllProductsCompletely() {
+  globalScope.__GUNA_CUSTOM_PRODUCTS__ = [];
+  globalScope.__GUNA_DELETED_PRODUCT_IDS__ = [];
+  globalScope.__GUNA_PRODUCTS_DB__ = [];
+  serverLiveProductsCache = null;
+  try {
+    ensureDataDir();
+    fs.writeFileSync(PRODUCTS_DB_FILE, '[]', 'utf-8');
+    fs.writeFileSync(CUSTOM_FILE, '[]', 'utf-8');
+    fs.writeFileSync(DELETED_FILE, '[]', 'utf-8');
+  } catch {}
 }
 
 export function saveDatabaseCatalog(prods: Product[]) {
@@ -445,8 +458,7 @@ export function deleteServerProduct(id: string): void {
 
 export function restoreAllServerProducts(): void {
   savePersistedDeletedIds([]);
-  const initial = seedProducts.map(normalizeProduct);
-  saveDatabaseCatalog(initial);
+  saveDatabaseCatalog([]);
   savePersistedCustomProducts([]);
   invalidateLiveProductsCache();
 }

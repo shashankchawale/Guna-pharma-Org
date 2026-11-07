@@ -12,6 +12,7 @@ import {
   Camera,
   CheckCircle2,
   ClipboardList,
+  ClipboardPaste,
   CreditCard,
   Edit2,
   ExternalLink,
@@ -50,7 +51,31 @@ import { useFormatPrice } from '@/store/locale';
 import { createClient } from '@/lib/supabase/client';
 import { useOrdersStore } from '@/store/orders';
 import { useProductsStore } from '@/store/products';
+import {
+  MEDICINE_CATEGORIES,
+  MEDICINE_CATEGORY_IDS,
+  matchesMedicineCategory,
+} from '@/lib/medicine-categories';
 
+const CATEGORY_DISPLAY_MAP: Record<string, string> = {
+  'erectile-dysfunction': 'ERECTILE DYSFUNCTION',
+  'steroids': 'STEROIDS',
+  'anti-anxiety': 'ANTI ANXIETY',
+  'anti-parasitic': 'ANTI PARASITIC',
+  'pain-killers': 'PAIN KILLERS',
+  'sleeping-pills': 'SLEEPING PILLS',
+  'weight-loss': 'WEIGHT LOSS',
+  'antibiotics': 'ANTIBIOTICS',
+  'anti-diabetics': 'ANTI DIABETICS',
+  'antihypertensive': 'ANTIHYPERTENSIVE',
+  'human-growth-hormones': 'HUMAN GROWTH HORMONES',
+  'skin-cream': 'SKIN CREAM',
+  'antiemetics': 'ANTIEMETICS',
+  'beauty': 'BEAUTY PRODUCTS',
+  'skincare': 'SKINCARE (FACE & BODY)',
+  'wellness': 'WELLNESS & VITAMINS',
+  'medicines': 'GENERAL MEDICINES',
+};
 
 const AUTHORIZED_ADMIN_EMAILS = [
   'gunapharma4@gmail.com',
@@ -248,6 +273,7 @@ export default function AdminDashboardPage() {
     addProduct: storeAddProduct,
     updateProduct: storeUpdateProduct,
     deleteProduct: storeDeleteProduct,
+    clearAllProducts,
     resetDeletedProducts,
     syncWithServer,
   } = useProductsStore();
@@ -265,6 +291,8 @@ export default function AdminDashboardPage() {
   const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
   const [deletingProduct, setDeletingProduct] = React.useState<Product | null>(null);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = React.useState(false);
+  const [isClearingAll, setIsClearingAll] = React.useState(false);
 
   // Toast feedback
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
@@ -281,7 +309,7 @@ export default function AdminDashboardPage() {
 
   // New product form
   const [formName, setFormName] = React.useState('');
-  const [formCategoryId, setFormCategoryId] = React.useState('medicines');
+  const [formCategoryId, setFormCategoryId] = React.useState('erectile-dysfunction');
   const [formBrand, setFormBrand] = React.useState('GUNA PHARMA');
   const [formMrp, setFormMrp] = React.useState('29.99');
   const [formSellingPrice, setFormSellingPrice] = React.useState('24.99');
@@ -302,18 +330,16 @@ export default function AdminDashboardPage() {
     setTimeout(() => setToastMsg(null), 3500);
   }, []);
 
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Image size should be under 10MB');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        // Compress image using canvas before storing to keep sizes small (< 60KB) and prevent quota errors
+  const processImageBlob = React.useCallback(
+    (blob: Blob, successMsg = 'Product photo loaded & optimized!') => {
+      if (blob.size > 15 * 1024 * 1024) {
+        showToast('Image size should be under 15MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (!result) return;
         try {
           const img = new Image();
           img.onload = () => {
@@ -341,25 +367,164 @@ export default function AdminDashboardPage() {
               ctx.drawImage(img, 0, 0, width, height);
               const compressed = canvas.toDataURL('image/jpeg', 0.82);
               setFormImageUrl(compressed);
-              showToast('Product photo optimized and loaded!');
+              showToast(successMsg);
             } else {
               setFormImageUrl(result);
-              showToast('Product photo uploaded from device!');
+              showToast(successMsg);
             }
           };
           img.onerror = () => {
             setFormImageUrl(result);
-            showToast('Product photo uploaded from device!');
+            showToast(successMsg);
           };
           img.src = result;
         } catch {
           setFormImageUrl(result);
-          showToast('Product photo uploaded from device!');
+          showToast(successMsg);
+        }
+      };
+      reader.readAsDataURL(blob);
+    },
+    [showToast]
+  );
+
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processImageBlob(file, 'Product photo uploaded from device!');
+  };
+
+  const handlePasteFromClipboard = React.useCallback(async () => {
+    // 1. Try reading rich clipboard (binary image blobs from "Copy image")
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.read) {
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+          const imageType = item.types.find((type) => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            processImageBlob(blob, 'Google image pasted into product photo!');
+            return;
+          }
+        }
+      }
+    } catch {
+      // Permission prompt dismissed or not supported in current context
+    }
+
+    // 2. Try reading clipboard text (e.g. copied image address or web link)
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+        const text = (await navigator.clipboard.readText()) || '';
+        const trimmed = text.trim();
+        if (
+          trimmed.startsWith('http://') ||
+          trimmed.startsWith('https://') ||
+          trimmed.startsWith('data:image')
+        ) {
+          setFormImageUrl(trimmed);
+          showToast('Image URL pasted into product photo!');
+          return;
+        }
+      }
+    } catch {}
+
+    // 3. User guidance toast
+    showToast('Tip: Copy any image on Google (Right-click > "Copy image"), then click Paste or press Ctrl + V!');
+  }, [processImageBlob, showToast]);
+
+  const handlePhotoDrop = React.useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Check dropped file
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (file.type.startsWith('image/')) {
+          processImageBlob(file, 'Dropped image loaded & optimized!');
+          return;
+        }
+      }
+
+      // Check dropped HTML for img src
+      const html = e.dataTransfer.getData('text/html');
+      if (html) {
+        const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (match && match[1]) {
+          setFormImageUrl(match[1]);
+          showToast('Dropped Google image loaded!');
+          return;
+        }
+      }
+
+      // Check dropped text URL
+      const text = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text');
+      if (
+        text &&
+        (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('data:image'))
+      ) {
+        setFormImageUrl(text.trim());
+        showToast('Dropped image URL loaded!');
+      }
+    },
+    [processImageBlob, showToast]
+  );
+
+  // Global window paste listener when Add or Edit modal is open
+  React.useEffect(() => {
+    if (!isAddModalOpen && !isEditModalOpen) return;
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      // Check if clipboard contains an image file/blob
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith('image/')) {
+            const file = items[i].getAsFile();
+            if (file) {
+              e.preventDefault();
+              processImageBlob(file, 'Google image pasted into product photo!');
+              return;
+            }
+          }
+        }
+      }
+
+      // Check if user pasted an image URL outside of standard form inputs (or inside the image URL input)
+      const target = e.target as HTMLElement | null;
+      const isTextInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+      const isImageUrlInput = target && target.getAttribute('data-image-url-input') === 'true';
+
+      if (!isTextInput || isImageUrlInput) {
+        const html = e.clipboardData?.getData('text/html');
+        if (html) {
+          const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+          if (match && match[1]) {
+            e.preventDefault();
+            setFormImageUrl(match[1]);
+            showToast('Google image pasted into product photo!');
+            return;
+          }
+        }
+
+        const text = e.clipboardData?.getData('text')?.trim();
+        if (
+          text &&
+          (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('data:image'))
+        ) {
+          if (!isTextInput) {
+            e.preventDefault();
+            setFormImageUrl(text);
+            showToast('Image link pasted into product photo!');
+          }
         }
       }
     };
-    reader.readAsDataURL(file);
-  };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => window.removeEventListener('paste', handleWindowPaste);
+  }, [isAddModalOpen, isEditModalOpen, processImageBlob, showToast]);
 
   const checkSupabaseStatus = React.useCallback(async (showNotification = false) => {
     setIsVerifyingSupabase(true);
@@ -397,6 +562,10 @@ export default function AdminDashboardPage() {
   }, []);
 
   const handleSeedAllToSupabase = async () => {
+    if (productList.length === 0) {
+      showToast('No products in catalog to push. Add your first product using "+ Add Product"!');
+      return;
+    }
     setIsSeedingSupabase(true);
     try {
       const res = await fetch('/api/products?action=seed_supabase', { method: 'POST' });
@@ -786,7 +955,7 @@ export default function AdminDashboardPage() {
   const openEditModal = (p: Product) => {
     setEditingProduct(p);
     setFormName(p.name);
-    setFormCategoryId(p.category_id || (typeof p.category === 'string' ? p.category : 'medicines'));
+    setFormCategoryId(p.category_id || (typeof p.category === 'string' ? p.category : 'erectile-dysfunction'));
     setFormBrand(p.manufacturer || 'GUNA PHARMA');
     setFormMrp(String(p.mrp));
     setFormSellingPrice(String(p.selling_price || p.price || p.mrp));
@@ -815,6 +984,8 @@ export default function AdminDashboardPage() {
       name: formName,
       category_id: formCategoryId,
       category: formCategoryId,
+      manufacturer: formBrand,
+      brand_id: formBrand.toLowerCase().replace(/\s+/g, '-'),
       mrp: mrpNum,
       selling_price: priceNum,
       price: priceNum,
@@ -876,6 +1047,21 @@ export default function AdminDashboardPage() {
       });
   };
 
+  // Confirm Clear All Products
+  const confirmClearAllProducts = async () => {
+    setIsClearingAll(true);
+    try {
+      await clearAllProducts();
+      await checkSupabaseStatus();
+      showToast('All products deleted! Database and Admin Panel are now at 0 products.');
+      setIsClearAllModalOpen(false);
+    } catch (err: any) {
+      showToast('Failed to clear products: ' + (err?.message || 'Error'));
+    } finally {
+      setIsClearingAll(false);
+    }
+  };
+
   // Filtered Bookings with multi-word search
   const filteredBookings = bookings.filter((b) => {
     if (bookingFilter === 'pending' && b.status !== 'pending') return false;
@@ -911,14 +1097,14 @@ export default function AdminDashboardPage() {
         const isMed =
           pCat === 'medicines' ||
           p.requires_prescription ||
-          ['pain-relief', 'cold-flu', 'digestive-health', 'first-aid'].includes(pCat);
+          MEDICINE_CATEGORY_IDS.includes(pCat);
         if (!isMed) return false;
       } else if (categoryFilter === 'beauty') {
-        if (!['beauty', 'cosmetics', 'hair-care', 'makeup'].includes(pCat)) return false;
+        if (pCat !== 'beauty') return false;
       } else if (categoryFilter === 'skincare') {
-        if (!['skincare', 'body-care', 'skin'].includes(pCat)) return false;
+        if (pCat !== 'skincare') return false;
       } else if (categoryFilter === 'wellness') {
-        if (!['wellness', 'vitamins', 'supplements', 'ayurveda', 'herbal'].includes(pCat)) return false;
+        if (pCat !== 'wellness') return false;
       } else if (pCat !== categoryFilter) {
         return false;
       }
@@ -1383,12 +1569,27 @@ export default function AdminDashboardPage() {
                   className="h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
                 >
                   <option value="all">All Products ({productList.length})</option>
-                  <option value="medicines">Medicines (Rx & Healthcare)</option>
-                  <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
-                  <option value="skincare">Skincare (Face & Body)</option>
-                  <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
-                  <option value="hair-care">Hair & Scalp Care</option>
-                  <option value="pain-relief">Pain Relief & Fever</option>
+                  <optgroup label="Medicine Categories (13 Categories)">
+                    <option value="erectile-dysfunction">ERECTILE DYSFUNCTION</option>
+                    <option value="steroids">STEROIDS</option>
+                    <option value="anti-anxiety">ANTI ANXIETY</option>
+                    <option value="anti-parasitic">ANTI PARASITIC</option>
+                    <option value="pain-killers">PAIN KILLERS</option>
+                    <option value="sleeping-pills">SLEEPING PILLS</option>
+                    <option value="weight-loss">WEIGHT LOSS</option>
+                    <option value="antibiotics">ANTIBIOTICS</option>
+                    <option value="anti-diabetics">ANTI DIABETICS</option>
+                    <option value="antihypertensive">ANTIHYPERTENSIVE</option>
+                    <option value="human-growth-hormones">HUMAN GROWTH HORMONES</option>
+                    <option value="skin-cream">SKIN CREAM</option>
+                    <option value="antiemetics">ANTIEMETICS</option>
+                  </optgroup>
+                  <optgroup label="Cosmetics & Healthcare">
+                    <option value="skincare">Skincare (Face & Body)</option>
+                    <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
+                    <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
+                    <option value="medicines">General Medicines (Other)</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -1424,6 +1625,18 @@ export default function AdminDashboardPage() {
                 <RefreshCw className="h-3.5 w-3.5 text-primary" />
                 <span>Sync Database</span>
               </button>
+
+              {productList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsClearAllModalOpen(true)}
+                  className="h-10 px-3.5 rounded-xl border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
+                  title="Permanently remove all products from database and admin panel"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                  <span>Delete All ({productList.length})</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1561,7 +1774,30 @@ export default function AdminDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-16 text-center">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-primary mb-3">
+                          <Package className="h-7 w-7 text-primary/80" />
+                        </div>
+                        <h3 className="text-base font-extrabold text-navy">No products in inventory</h3>
+                        <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
+                          {searchQuery || categoryFilter !== 'all'
+                            ? 'No products match your current search or filter.'
+                            : 'Database and catalog are completely cleared (0 products). Click the button below to add your first product.'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddModalOpen(true)}
+                          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-extrabold text-white shadow-soft hover:bg-primary-hover transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Add Product Manually</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredProducts.map((product) => (
                     <tr key={product.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -1586,8 +1822,8 @@ export default function AdminDashboardPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-block rounded-lg bg-slate-100 px-2 py-1 font-semibold text-gray-700 capitalize">
-                          {(product.category_id || (typeof product.category === 'string' ? product.category : 'medicines')).replace(/-/g, ' ')}
+                        <span className="inline-block rounded-lg bg-blue-50 px-2.5 py-1 font-bold text-primary text-[10.5px] uppercase tracking-wide border border-blue-100">
+                          {CATEGORY_DISPLAY_MAP[product.category_id] || (product.category_id || (typeof product.category === 'string' ? product.category : 'medicines')).replace(/-/g, ' ').toUpperCase()}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-bold text-navy">
@@ -1642,7 +1878,7 @@ export default function AdminDashboardPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -1999,8 +2235,15 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              {/* Dedicated Product Photo Section */}
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-3.5 space-y-3">
+              {/* Dedicated Product Photo Section with Google Copy/Paste Support */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={handlePhotoDrop}
+                className="rounded-2xl border-2 border-blue-200 bg-blue-50/70 p-3.5 space-y-3 transition-colors hover:border-primary/50"
+              >
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-navy text-xs flex items-center gap-1.5">
                     <ImageIcon className="h-4 w-4 text-primary" />
@@ -2019,7 +2262,7 @@ export default function AdminDashboardPage() {
 
                 <div className="flex items-start gap-3">
                   {/* Live Preview Box */}
-                  <div className="relative h-20 w-20 shrink-0 rounded-xl overflow-hidden bg-white border border-border/80 shadow-xs flex items-center justify-center p-1">
+                  <div className="relative h-22 w-22 shrink-0 rounded-xl overflow-hidden bg-white border border-border/80 shadow-xs flex items-center justify-center p-1">
                     {formImageUrl ? (
                       <img
                         src={formImageUrl}
@@ -2035,23 +2278,34 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div className="flex-1 space-y-2">
-                    {/* Image URL input from Flipkart / Amazon / any website */}
+                    {/* Image URL input from Google or any website */}
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
                         <Link2 className="h-3.5 w-3.5" />
                       </div>
                       <input
                         type="url"
+                        data-image-url-input="true"
                         value={formImageUrl}
                         onChange={(e) => setFormImageUrl(e.target.value)}
-                        placeholder="Paste image link from Flipkart, Amazon, etc."
+                        placeholder="Paste image link from Google, Amazon, etc. or press Ctrl+V"
                         className="w-full h-8 pl-8 pr-2 rounded-lg border border-border bg-white text-[11px] text-navy focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
 
-                    {/* Upload button from device */}
-                    <div className="flex items-center gap-2">
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-[11px] font-bold text-navy hover:bg-slate-50 cursor-pointer shadow-2xs">
+                    {/* Action buttons: Paste from Google and Upload from device */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handlePasteFromClipboard}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+                        title="Click to paste image directly from clipboard (or press Ctrl+V anywhere)"
+                      >
+                        <ClipboardPaste className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Paste from Google (Ctrl+V)</span>
+                      </button>
+
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-[11px] font-bold text-navy hover:bg-slate-50 cursor-pointer shadow-2xs transition-colors">
                         <Upload className="h-3.5 w-3.5 text-primary" />
                         <span>Upload from device</span>
                         <input
@@ -2061,11 +2315,17 @@ export default function AdminDashboardPage() {
                           className="hidden"
                         />
                       </label>
-                      <span className="text-[10px] text-gray-400">JPG, PNG, WebP (Max 5MB)</span>
+                    </div>
+
+                    {/* Google copy helper tip banner */}
+                    <div className="flex items-center gap-1.5 text-[10.5px] text-blue-900/80 bg-white/80 rounded-lg px-2.5 py-1.5 border border-blue-200/60">
+                      <Sparkles className="h-3 w-3 text-primary shrink-0" />
+                      <span>
+                        <strong>From Google:</strong> Right-click image &rarr; <em>&quot;Copy image&quot;</em> &rarr; click <strong>Paste from Google</strong> or press <strong>Ctrl+V</strong>.
+                      </span>
                     </div>
                   </div>
                 </div>
-
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -2074,17 +2334,29 @@ export default function AdminDashboardPage() {
                   <select
                     value={formCategoryId}
                     onChange={(e) => setFormCategoryId(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary font-medium"
                   >
-                    <option value="medicines">Medicines (Rx & Healthcare)</option>
-                    <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
-                    <option value="skincare">Skincare (Face & Body Care)</option>
-                    <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
-                    <option value="pain-relief">Pain Relief & Fever</option>
-                    <option value="hair-care">Hair & Scalp Care</option>
-                    <option value="cold-flu">Cold & Flu</option>
-                    <option value="digestive-health">Digestive Health</option>
-                    <option value="first-aid">First Aid & Antiseptics</option>
+                    <optgroup label="Medicine Categories (13 Categories)">
+                      <option value="erectile-dysfunction">ERECTILE DYSFUNCTION</option>
+                      <option value="steroids">STEROIDS</option>
+                      <option value="anti-anxiety">ANTI ANXIETY</option>
+                      <option value="anti-parasitic">ANTI PARASITIC</option>
+                      <option value="pain-killers">PAIN KILLERS</option>
+                      <option value="sleeping-pills">SLEEPING PILLS</option>
+                      <option value="weight-loss">WEIGHT LOSS</option>
+                      <option value="antibiotics">ANTIBIOTICS</option>
+                      <option value="anti-diabetics">ANTI DIABETICS</option>
+                      <option value="antihypertensive">ANTIHYPERTENSIVE</option>
+                      <option value="human-growth-hormones">HUMAN GROWTH HORMONES</option>
+                      <option value="skin-cream">SKIN CREAM</option>
+                      <option value="antiemetics">ANTIEMETICS</option>
+                    </optgroup>
+                    <optgroup label="Cosmetics & Healthcare">
+                      <option value="skincare">Skincare (Face & Body Care)</option>
+                      <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
+                      <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
+                      <option value="medicines">General Medicines (Other)</option>
+                    </optgroup>
                   </select>
                 </div>
 
@@ -2218,7 +2490,15 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Dedicated Product Photo Section for Edit Modal */}
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-3.5 space-y-3">
+              {/* Dedicated Product Photo Section with Google Copy/Paste Support */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={handlePhotoDrop}
+                className="rounded-2xl border-2 border-blue-200 bg-blue-50/70 p-3.5 space-y-3 transition-colors hover:border-primary/50"
+              >
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-navy text-xs flex items-center gap-1.5">
                     <ImageIcon className="h-4 w-4 text-primary" />
@@ -2237,7 +2517,7 @@ export default function AdminDashboardPage() {
 
                 <div className="flex items-start gap-3">
                   {/* Live Preview Box */}
-                  <div className="relative h-20 w-20 shrink-0 rounded-xl overflow-hidden bg-white border border-border/80 shadow-xs flex items-center justify-center p-1">
+                  <div className="relative h-22 w-22 shrink-0 rounded-xl overflow-hidden bg-white border border-border/80 shadow-xs flex items-center justify-center p-1">
                     {formImageUrl ? (
                       <img
                         src={formImageUrl}
@@ -2253,23 +2533,34 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div className="flex-1 space-y-2">
-                    {/* Image URL input from Flipkart / Amazon / any website */}
+                    {/* Image URL input from Google or any website */}
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
                         <Link2 className="h-3.5 w-3.5" />
                       </div>
                       <input
                         type="url"
+                        data-image-url-input="true"
                         value={formImageUrl}
                         onChange={(e) => setFormImageUrl(e.target.value)}
-                        placeholder="Paste image link from Flipkart, Amazon, etc."
+                        placeholder="Paste image link from Google, Amazon, etc. or press Ctrl+V"
                         className="w-full h-8 pl-8 pr-2 rounded-lg border border-border bg-white text-[11px] text-navy focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
 
-                    {/* Upload button from device */}
-                    <div className="flex items-center gap-2">
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-[11px] font-bold text-navy hover:bg-slate-50 cursor-pointer shadow-2xs">
+                    {/* Action buttons: Paste from Google and Upload from device */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handlePasteFromClipboard}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+                        title="Click to paste image directly from clipboard (or press Ctrl+V anywhere)"
+                      >
+                        <ClipboardPaste className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Paste from Google (Ctrl+V)</span>
+                      </button>
+
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-[11px] font-bold text-navy hover:bg-slate-50 cursor-pointer shadow-2xs transition-colors">
                         <Upload className="h-3.5 w-3.5 text-primary" />
                         <span>Upload new photo</span>
                         <input
@@ -2279,11 +2570,17 @@ export default function AdminDashboardPage() {
                           className="hidden"
                         />
                       </label>
-                      <span className="text-[10px] text-gray-400">JPG, PNG, WebP</span>
+                    </div>
+
+                    {/* Google copy helper tip banner */}
+                    <div className="flex items-center gap-1.5 text-[10.5px] text-blue-900/80 bg-white/80 rounded-lg px-2.5 py-1.5 border border-blue-200/60">
+                      <Sparkles className="h-3 w-3 text-primary shrink-0" />
+                      <span>
+                        <strong>From Google:</strong> Right-click image &rarr; <em>&quot;Copy image&quot;</em> &rarr; click <strong>Paste from Google</strong> or press <strong>Ctrl+V</strong>.
+                      </span>
                     </div>
                   </div>
                 </div>
-
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -2292,33 +2589,44 @@ export default function AdminDashboardPage() {
                   <select
                     value={formCategoryId}
                     onChange={(e) => setFormCategoryId(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy bg-white focus:outline-none focus:ring-2 focus:ring-primary font-medium"
                   >
-                    <option value="medicines">Medicines (Rx & Healthcare)</option>
-                    <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
-                    <option value="skincare">Skincare (Face & Body Care)</option>
-                    <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
-                    <option value="pain-relief">Pain Relief & Fever</option>
-                    <option value="hair-care">Hair & Scalp Care</option>
-                    <option value="cold-flu">Cold & Flu</option>
-                    <option value="digestive-health">Digestive Health</option>
-                    <option value="first-aid">First Aid & Antiseptics</option>
+                    <optgroup label="Medicine Categories (13 Categories)">
+                      <option value="erectile-dysfunction">ERECTILE DYSFUNCTION</option>
+                      <option value="steroids">STEROIDS</option>
+                      <option value="anti-anxiety">ANTI ANXIETY</option>
+                      <option value="anti-parasitic">ANTI PARASITIC</option>
+                      <option value="pain-killers">PAIN KILLERS</option>
+                      <option value="sleeping-pills">SLEEPING PILLS</option>
+                      <option value="weight-loss">WEIGHT LOSS</option>
+                      <option value="antibiotics">ANTIBIOTICS</option>
+                      <option value="anti-diabetics">ANTI DIABETICS</option>
+                      <option value="antihypertensive">ANTIHYPERTENSIVE</option>
+                      <option value="human-growth-hormones">HUMAN GROWTH HORMONES</option>
+                      <option value="skin-cream">SKIN CREAM</option>
+                      <option value="antiemetics">ANTIEMETICS</option>
+                    </optgroup>
+                    <optgroup label="Cosmetics & Healthcare">
+                      <option value="skincare">Skincare (Face & Body Care)</option>
+                      <option value="beauty">Beauty Products (Cosmetics & Hair)</option>
+                      <option value="wellness">Wellness Products (Vitamins & Supplements)</option>
+                      <option value="medicines">General Medicines (Other)</option>
+                    </optgroup>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Stock Quantity *</label>
+                  <label className="block font-bold text-gray-700 mb-1">Manufacturer / Brand</label>
                   <input
-                    type="number"
-                    required
-                    value={formStock}
-                    onChange={(e) => setFormStock(e.target.value)}
+                    type="text"
+                    value={formBrand}
+                    onChange={(e) => setFormBrand(e.target.value)}
                     className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">MRP ($) *</label>
                   <input
@@ -2339,6 +2647,17 @@ export default function AdminDashboardPage() {
                     required
                     value={formSellingPrice}
                     onChange={(e) => setFormSellingPrice(e.target.value)}
+                    className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Stock Quantity *</label>
+                  <input
+                    type="number"
+                    required
+                    value={formStock}
+                    onChange={(e) => setFormStock(e.target.value)}
                     className="w-full h-10 rounded-xl border border-border px-3 text-xs text-navy focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
@@ -2435,6 +2754,47 @@ export default function AdminDashboardPage() {
                 className="px-5 py-2 rounded-xl bg-rose-600 text-xs font-bold text-white hover:bg-rose-700 shadow-soft"
               >
                 Delete Product
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CLEAR ALL PRODUCTS */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-50 border border-rose-200">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-navy">Delete All Products?</h2>
+                <p className="text-xs text-gray-500">Reset database and catalog to 0 products.</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-700 bg-slate-50 p-3 rounded-xl border border-border leading-relaxed">
+              This will permanently delete all <strong className="text-rose-700 font-bold">{productList.length} products</strong> from your database and Supabase so you can manually add each product from a clean slate.
+            </p>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsClearAllModalOpen(false)}
+                disabled={isClearingAll}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmClearAllProducts}
+                disabled={isClearingAll}
+                className="px-5 py-2 rounded-xl bg-rose-600 text-xs font-bold text-white hover:bg-rose-700 shadow-soft disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {isClearingAll ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                <span>{isClearingAll ? 'Deleting All...' : 'Yes, Delete All Products'}</span>
               </button>
             </div>
           </div>

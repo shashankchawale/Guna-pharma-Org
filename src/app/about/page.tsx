@@ -1,6 +1,42 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, Globe2, HeartPulse, ShieldCheck, Sparkles } from 'lucide-react';
+import { getAppBaseUrl } from '@/lib/seo';
+
+const baseUrl = getAppBaseUrl();
+
+export const metadata: Metadata = {
+  title: 'About Us | GUNA PHARMA',
+  description:
+    'Learn about GUNA PHARMA - our clinical quality assurance, ethical sourcing, certified pharmaceuticals, and worldwide healthcare distribution network.',
+  alternates: {
+    canonical: `${baseUrl}/about`,
+  },
+  openGraph: {
+    title: 'About GUNA PHARMA - Trusted Global Healthcare & Exporter',
+    description:
+      'GUNA PHARMA brings skincare, wellness and certified healthcare essentials together—serving customers and trade buyers worldwide.',
+    url: `${baseUrl}/about`,
+    type: 'website',
+    siteName: 'GUNA PHARMA',
+    images: [
+      {
+        url: `${baseUrl}/og-image.jpg`,
+        width: 1200,
+        height: 630,
+        alt: 'About GUNA PHARMA',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'About GUNA PHARMA - Global Healthcare & Medicines',
+    description:
+      'Certified pharmaceutical formulations, luxury skincare, and worldwide healthcare delivery.',
+    images: [`${baseUrl}/og-image.jpg`],
+  },
+};
 
 const principles = [
   { icon: HeartPulse, title: 'Care-first experience', text: 'Support designed around real health and wellness needs.' },

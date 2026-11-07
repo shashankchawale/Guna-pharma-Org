@@ -73,6 +73,7 @@ interface ProductsState {
   deleteProduct: (id: string) => void;
   restoreProduct: (id: string) => void;
   resetDeletedProducts: () => void;
+  clearAllProducts: () => Promise<void>;
   syncWithServer: (forceReset?: boolean) => Promise<void>;
   setIsHydrated: (hydrated: boolean) => void;
   clearError: () => void;
@@ -118,7 +119,7 @@ let inFlightSyncPromise: Promise<void> | null = null;
 export const useProductsStore = create<ProductsState>()(
   persist(
     (set, get) => ({
-      products: mergeCatalogProducts(initialSeedProducts, []),
+      products: [],
       deletedProductIds: [],
       isHydrated: false,
       isLoading: false,
@@ -266,34 +267,64 @@ export const useProductsStore = create<ProductsState>()(
         if (typeof window !== 'undefined') {
           try {
             localStorage.removeItem('guna_deleted_product_ids');
-            document.cookie = 'guna_deleted_ids=; path=/; max-age=0';
+            document.cookie = 'guna_deleted_ids=; path=/; max-age=0; SameSite=Lax';
             window.dispatchEvent(new CustomEvent('guna-product-deleted'));
           } catch {}
         }
         set({
           deletedProductIds: [],
-          products: mergeCatalogProducts(initialSeedProducts, []),
+          products: [],
         });
         fetch('/api/products?action=restore', { method: 'POST' }).catch(() => {});
       },
 
+      clearAllProducts: async () => {
+        set({ products: [], deletedProductIds: [], isLoading: false, error: null });
+        if (typeof window !== 'undefined') {
+          try {
+            [
+              'guna_products_store',
+              'guna_products_store_v1',
+              'guna_products_store_v2',
+              'guna_products_store_v3',
+              'guna_products_store_v4',
+              'guna_products_store_v5',
+              'guna_products_store_v6',
+              'guna_deleted_product_ids',
+            ].forEach((k) => localStorage.removeItem(k));
+            document.cookie = 'guna_deleted_ids=; path=/; max-age=0; SameSite=Lax';
+            window.dispatchEvent(new CustomEvent('guna-product-deleted'));
+          } catch {}
+        }
+        try {
+          await fetch('/api/products?action=clear_all', { method: 'POST' });
+        } catch (err) {
+          console.warn('Clear all products server call failed:', err);
+        }
+      },
+
       syncWithServer: async (forceReset = false) => {
+        // Prevent SSR URL parse errors when Zustand rehydrates on Node server
+        if (typeof window === 'undefined') {
+          return;
+        }
+
         const now = Date.now();
-        // Prevent repeated redundant API calls within 30s if we already have products
+        // Prevent repeated redundant API calls within 15s if we already did a sync recently
         if (!forceReset && inFlightSyncPromise) {
           return inFlightSyncPromise;
         }
-        if (!forceReset && now - lastSyncTimestamp < 30_000 && (get().products || []).length > 0) {
+        if (!forceReset && now - lastSyncTimestamp < 15_000) {
           return;
         }
 
         inFlightSyncPromise = (async () => {
-          // Only show global loading on explicit force reset or if list is empty
-          if (forceReset || (get().products || []).length === 0) {
+          if (forceReset) {
             set({ isLoading: true, error: null });
           }
           try {
-            const res = await fetch('/api/products?meta=true', { cache: 'no-store' });
+            const endpoint = `${window.location.origin}/api/products?meta=true`;
+            const res = await fetch(endpoint, { cache: 'no-store' });
             if (!res.ok) {
               throw new Error(`Server returned status ${res.status}`);
             }
@@ -309,14 +340,19 @@ export const useProductsStore = create<ProductsState>()(
             }
 
             if (Array.isArray(serverProducts)) {
-              const current = forceReset ? [] : (get().products || []);
               const deletedIds = get().deletedProductIds || [];
-              const merged = mergeCatalogProducts(
-                [...serverProducts, ...current],
-                deletedIds
+              const deletedSet = new Set(
+                deletedIds.map((id) => (id || '').trim().toLowerCase()).filter(Boolean)
               );
+              // Server is authoritative: if server has 0 items, active is 0 items
+              const active = serverProducts.filter((p) => {
+                if (!p) return false;
+                const pIdLower = (p.id || '').toLowerCase();
+                const pSlugLower = (p.slug || '').toLowerCase();
+                return !deletedSet.has(pIdLower) && !deletedSet.has(pSlugLower);
+              });
               lastSyncTimestamp = Date.now();
-              set({ products: merged, source, isLoading: false, error: null });
+              set({ products: active, source, isLoading: false, error: null });
             } else {
               set({ isLoading: false });
             }
@@ -332,12 +368,11 @@ export const useProductsStore = create<ProductsState>()(
       },
     }),
     {
-      name: 'guna_products_store_v4',
+      name: 'guna_products_store_v6',
       storage: createJSONStorage(() => safeStorage),
       partialize: (state) => ({
         deletedProductIds: state.deletedProductIds,
         products: state.products.map((p) => {
-          // If image is a large data URL, replace it in localStorage with a placeholder to avoid exceeding browser quota
           const isLargeData = (url?: string) => typeof url === 'string' && url.startsWith('data:') && url.length > 2000;
           const fallback = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80';
           return {
@@ -349,37 +384,25 @@ export const useProductsStore = create<ProductsState>()(
         }),
       }),
       onRehydrateStorage: () => (state) => {
+        if (typeof window !== 'undefined') {
+          try {
+            // Aggressively clean up legacy storage caches so old 34 products are purged immediately
+            [
+              'guna_products_store',
+              'guna_products_store_v1',
+              'guna_products_store_v2',
+              'guna_products_store_v3',
+              'guna_products_store_v4',
+              'guna_products_store_v5',
+            ].forEach((k) => localStorage.removeItem(k));
+          } catch {}
+        }
         if (state) {
           state.setIsHydrated(true);
-
+          // Only perform live sync with server in browser upon hydration
           if (typeof window !== 'undefined') {
-            try {
-              // Clean up all legacy storage caches to free up browser quota
-              localStorage.removeItem('guna_products_store');
-              localStorage.removeItem('guna_products_store_v1');
-              localStorage.removeItem('guna_products_store_v2');
-              localStorage.removeItem('guna_products_store_v3');
-            } catch {}
+            state.syncWithServer(true);
           }
-
-          let deletedIds = state.deletedProductIds || [];
-          if (typeof window !== 'undefined') {
-            try {
-              const storedDeleted = localStorage.getItem('guna_deleted_product_ids');
-              if (storedDeleted) {
-                const parsed = JSON.parse(storedDeleted);
-                if (Array.isArray(parsed)) {
-                  deletedIds = Array.from(new Set([...deletedIds, ...parsed]));
-                }
-              }
-            } catch {}
-          }
-
-          state.setProducts(mergeCatalogProducts(state.products, deletedIds));
-          useProductsStore.setState({ deletedProductIds: deletedIds });
-
-          // Trigger live server sync
-          state.syncWithServer(true);
         }
       },
     }

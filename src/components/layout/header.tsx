@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, Search, ShoppingCart, X, User, ShieldCheck, Heart, ArrowRight } from 'lucide-react';
+import { Menu, Search, ShoppingCart, X, User, ShieldCheck, Heart, ArrowRight, ChevronDown, Pill } from 'lucide-react';
 import { cn, useIsMounted } from '@/lib/utils';
 import { brandConfig } from '@/lib/config';
 import { Avatar } from '@/components/ui/avatar';
@@ -15,6 +15,7 @@ import { LocaleSwitcher } from '@/components/layout/locale-switcher';
 import { useTranslation, useFormatPrice } from '@/store/locale';
 import { useAuthStore } from '@/store/auth';
 import { useProductsStore } from '@/store/products';
+import { MEDICINE_CATEGORIES } from '@/lib/medicine-categories';
 
 export function Header() {
   const router = useRouter();
@@ -30,12 +31,35 @@ export function Header() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchFocused, setIsSearchFocused] = React.useState(false);
   const [navigatingHref, setNavigatingHref] = React.useState<string | null>(null);
+  const [isMedicinesDropdownOpen, setIsMedicinesDropdownOpen] = React.useState(false);
+  const [isMobileMedicinesExpanded, setIsMobileMedicinesExpanded] = React.useState(true);
+  const dropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const searchContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleMedicinesMouseEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    setIsMedicinesDropdownOpen(true);
+  };
+
+  const handleMedicinesMouseLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setIsMedicinesDropdownOpen(false);
+    }, 200);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+    };
+  }, []);
 
   const [prevPathname, setPrevPathname] = React.useState(pathname);
   if (prevPathname !== pathname) {
     setPrevPathname(pathname);
     setNavigatingHref(null);
+    setIsMedicinesDropdownOpen(false);
   }
 
   const mounted = useIsMounted();
@@ -386,6 +410,127 @@ export function Header() {
             {navItems.map((item) => {
               const active = isActive(item.href);
               const isPending = navigatingHref === item.href && !active;
+              const isMedicines = item.href === '/medicines';
+
+              if (isMedicines) {
+                return (
+                  <li
+                    key={item.href}
+                    className="relative"
+                    onMouseEnter={handleMedicinesMouseEnter}
+                    onMouseLeave={handleMedicinesMouseLeave}
+                  >
+                    <div className="flex items-center">
+                      <Link
+                        href={item.href}
+                        prefetch={true}
+                        onClick={() => {
+                          if (!active) setNavigatingHref(item.href);
+                          setIsMedicinesDropdownOpen(false);
+                        }}
+                        className={cn(
+                          'relative inline-flex items-center gap-1.5 pl-4 pr-1.5 py-2.5 rounded-l-xl text-xs sm:text-sm font-semibold transition-colors duration-fast',
+                          active
+                            ? 'text-primary bg-blue-50/80 font-bold'
+                            : isPending
+                            ? 'text-primary bg-blue-50/60 font-semibold'
+                            : 'text-gray-600 hover:text-navy hover:bg-gray-50'
+                        )}
+                      >
+                        <span>{item.label}</span>
+                        {isPending && (
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
+                        )}
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setIsMedicinesDropdownOpen((prev) => !prev)}
+                        className={cn(
+                          'pr-2 pl-0.5 py-2.5 rounded-r-xl transition-colors',
+                          active
+                            ? 'text-primary bg-blue-50/80'
+                            : isPending
+                            ? 'text-primary bg-blue-50/60'
+                            : 'text-gray-400 hover:text-navy hover:bg-gray-50',
+                          isMedicinesDropdownOpen && 'text-primary'
+                        )}
+                        aria-label="Toggle medicines categories menu"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            'h-3.5 w-3.5 transition-transform duration-200',
+                            isMedicinesDropdownOpen && 'rotate-180 text-primary'
+                          )}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Desktop Dropdown Mega Menu for Medicines Category */}
+                    {isMedicinesDropdownOpen && (
+                      <div
+                        className="absolute left-0 top-full pt-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150"
+                        onMouseEnter={handleMedicinesMouseEnter}
+                        onMouseLeave={handleMedicinesMouseLeave}
+                      >
+                        <div className="w-[740px] rounded-2xl bg-white border border-border shadow-2xl overflow-hidden p-4">
+                          {/* Dropdown Header */}
+                          <div className="flex items-center justify-between pb-3 mb-3 border-b border-border/70">
+                            <div>
+                              <h4 className="text-xs font-extrabold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                                <Pill className="h-3.5 w-3.5 text-primary" />
+                                Medicines & Therapeutics Categories
+                              </h4>
+                              <p className="text-[11px] text-gray-500 font-medium">
+                                13 certified therapeutic categories verified by licensed pharmacists
+                              </p>
+                            </div>
+                            <Link
+                              href="/medicines"
+                              onClick={() => setIsMedicinesDropdownOpen(false)}
+                              className="text-xs font-bold text-primary hover:underline flex items-center gap-1 bg-blue-50/80 px-2.5 py-1 rounded-lg transition-colors"
+                            >
+                              <span>All Medicines</span>
+                              <ArrowRight className="h-3 w-3" />
+                            </Link>
+                          </div>
+
+                          {/* 13 Categories Grid */}
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {MEDICINE_CATEGORIES.map((cat) => (
+                              <Link
+                                key={cat.id}
+                                href={`/medicines?filter=${cat.id}`}
+                                onClick={() => setIsMedicinesDropdownOpen(false)}
+                                className="group flex flex-col p-2.5 rounded-xl border border-transparent hover:border-blue-100 hover:bg-blue-50/70 transition-all text-left"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-primary/70 group-hover:bg-primary group-hover:scale-125 transition-all" />
+                                  <span className="text-[11px] font-bold text-navy group-hover:text-primary tracking-tight transition-colors">
+                                    {cat.name}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-gray-400 group-hover:text-gray-600 truncate mt-0.5 pl-3">
+                                  {cat.shortDesc}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+
+                          {/* Dropdown Footer Guarantee */}
+                          <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-gray-500 bg-slate-50/70 -mx-4 -mb-4 px-4 py-2">
+                            <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                              Certified Exporter • 100% Genuine Pharmacy Formulations
+                            </span>
+                            <span className="text-gray-400">Direct Express Shipping</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              }
+
               return (
                 <li key={item.href}>
                   <Link
@@ -633,7 +778,7 @@ export function Header() {
             </div>
 
             {/* Scrollable navigation links */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1.5" aria-label="Mobile navigation links">
+            <nav className="flex-1 overflow-y-auto p-4 space-y-2" aria-label="Mobile navigation links">
               {[
                 { href: '/', label: t('home', 'Home') },
                 { href: '/medicines', label: t('medicines', 'Medicines') },
@@ -645,6 +790,71 @@ export function Header() {
               ].map((item) => {
                 const active = isActive(item.href);
                 const isPending = navigatingHref === item.href && !active;
+                const isMedicines = item.href === '/medicines';
+
+                if (isMedicines) {
+                  return (
+                    <div key={item.href} className="rounded-2xl border border-border/80 overflow-hidden bg-white shadow-2xs">
+                      <div className="flex items-center justify-between bg-slate-50/90 pr-2">
+                        <Link
+                          href="/medicines"
+                          prefetch={true}
+                          onClick={() => {
+                            if (!active) setNavigatingHref(item.href);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className={cn(
+                            'flex-1 flex items-center gap-2.5 px-4 py-3 text-base font-bold transition-colors',
+                            active ? 'text-primary' : 'text-navy'
+                          )}
+                        >
+                          <Pill className="h-4 w-4 text-primary" />
+                          <span>{t('medicines', 'Medicines')}</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setIsMobileMedicinesExpanded((prev) => !prev)}
+                          className="p-2 text-gray-500 hover:text-navy rounded-xl"
+                          aria-label="Toggle medicines categories"
+                        >
+                          <ChevronDown
+                            className={cn(
+                              'h-4 w-4 transition-transform duration-200',
+                              isMobileMedicinesExpanded && 'rotate-180 text-primary'
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      {isMobileMedicinesExpanded && (
+                        <div className="divide-y divide-border/40 bg-white py-1">
+                          <Link
+                            href="/medicines"
+                            prefetch={true}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="flex items-center justify-between px-4 py-2 text-xs font-bold text-primary hover:bg-blue-50/60"
+                          >
+                            <span>ALL MEDICINES (OVERVIEW)</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </Link>
+                          {MEDICINE_CATEGORIES.map((cat) => (
+                            <Link
+                              key={cat.id}
+                              href={`/medicines?filter=${cat.id}`}
+                              prefetch={true}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                              className="flex items-center justify-between px-4 py-2.5 text-xs text-gray-700 hover:text-primary hover:bg-blue-50/50 transition-colors"
+                            >
+                              <span className="font-semibold tracking-tight">{cat.name}</span>
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary/40" />
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.href}
